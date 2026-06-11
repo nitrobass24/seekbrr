@@ -17,7 +17,7 @@ Legend: `[ ]` todo · `[x]` done · each leaf should land in its own focused com
 - [x] `make build` and `make test` green with the vendored snapshot embedded
 - [x] Author the management-API `openapi.yaml` stub under `internal/web/swagger` + drift test
       (`make test-openapi`)
-- [ ] Wire `cobra`/`viper` entrypoint and a typed config struct (no `map[string]any`)
+- [x] Wire `cobra`/`viper` entrypoint and a typed config struct (no `map[string]any`)
 
 ## Phase 1 — Engine proof (offline) — *retires the existential risk*
 

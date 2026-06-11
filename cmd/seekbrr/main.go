@@ -6,16 +6,11 @@ package main
 import (
 	"fmt"
 	"os"
-
-	"github.com/autobrr/seekbrr/internal/version"
 )
 
 func main() {
-	// TODO(seekbrr): wire cobra/viper per AGENTS.md. This is a placeholder
-	// entrypoint that keeps `go build ./...` green from the first commit.
-	if len(os.Args) > 1 && (os.Args[1] == "version" || os.Args[1] == "--version") {
-		fmt.Println(version.String())
-		return
+	if err := newRootCmd().Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, "seekbrr:", err)
+		os.Exit(1)
 	}
-	fmt.Fprintf(os.Stderr, "seekbrr %s — not yet implemented; see docs/plan.md\n", version.String())
 }
