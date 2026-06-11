@@ -1,0 +1,33 @@
+name: vendor-definitions
+
+# Refresh the embedded Jackett definition snapshot on a schedule and open a PR
+# when upstream changes. Pin JACKETT_REF below to a commit for reproducible
+# release builds; this job tracks the moving tip for visibility.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refresh Jackett definitions
+        env:
+          JACKETT_REF: master
+        run: ./scripts/vendor-definitions.sh
+      - name: Open PR on change
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore(defs): refresh vendored Jackett definitions"
+          title: "chore(defs): refresh vendored Jackett definitions"
+          body: |
+            Automated refresh of the embedded Jackett definition snapshot.
+            Review the diff and the new `.jackett-ref` before merging.
+          branch: chore/vendor-definitions
+          delete-branch: true

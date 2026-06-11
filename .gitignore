@@ -1,0 +1,14 @@
+/bin/
+/dist/
+*.out
+*.test
+lint-report.json
+
+# local config & data (may contain secrets)
+/config.toml
+/config.yaml
+/data/
+.env
+.env.*
+
+.DS_Store
