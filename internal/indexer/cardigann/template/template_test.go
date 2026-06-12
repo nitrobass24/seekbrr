@@ -1,6 +1,7 @@
 package template
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -296,7 +297,9 @@ func TestCorpusParses(t *testing.T) {
 		failures []string
 	)
 
+	seenDefIDs := make(map[string]bool, len(defs))
 	for _, def := range defs {
+		seenDefIDs[def.ID] = true
 		if knownDefBugs[def.ID] {
 			continue
 		}
@@ -312,6 +315,20 @@ func TestCorpusParses(t *testing.T) {
 			}
 			failures = append(failures, def.ID+": "+strconv.Quote(tmpl)+": "+err.Error())
 		}
+	}
+
+	// A knownDefBugs entry whose id no longer exists in the corpus is a stale
+	// exclusion (def removed or renamed upstream); fail so it must be removed.
+	var stale []string
+	for id := range knownDefBugs {
+		if !seenDefIDs[id] {
+			stale = append(stale, id)
+		}
+	}
+	if len(stale) > 0 {
+		sort.Strings(stale)
+		t.Errorf("knownDefBugs has %d stale entr(y/ies) matching no definition: %s "+
+			"(remove or update them)", len(stale), strings.Join(stale, ", "))
 	}
 
 	if len(failures) > 0 {
