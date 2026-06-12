@@ -127,8 +127,8 @@ func collectPatterns(def *loader.Definition) []string {
 		out = append(out, patternsFromFilters(fbs)...)
 	}
 
-	for _, sf := range def.Search.Fields {
-		add(sf.Filters)
+	for _, fe := range def.Search.Fields.Ordered() {
+		add(fe.Block.Filters)
 	}
 	add(def.Search.KeywordsFilters)
 	add(def.Search.PreprocessingFilters)

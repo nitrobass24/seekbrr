@@ -379,8 +379,8 @@ func collectSearch(add func(string), s *loader.Search) {
 	for _, f := range s.Rows.Filters {
 		addArgs(add, f.Args)
 	}
-	for _, field := range s.Fields {
-		addSelector(add, field)
+	for _, fe := range s.Fields.Ordered() {
+		addSelector(add, fe.Block)
 	}
 }
 

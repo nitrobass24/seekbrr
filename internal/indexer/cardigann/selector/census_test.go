@@ -190,8 +190,8 @@ func htmlSelectors(def *loader.Definition) []string {
 	if d := def.Search.Rows.DateHeaders; d != nil {
 		out = appendSelectorBlock(out, *d)
 	}
-	for _, field := range def.Search.Fields {
-		out = appendSelectorBlock(out, field)
+	for _, fe := range def.Search.Fields.Ordered() {
+		out = appendSelectorBlock(out, fe.Block)
 	}
 	return out
 }
@@ -210,9 +210,9 @@ func jsonPaths(def *loader.Definition) []string {
 	if c := def.Search.Rows.Count; c != nil && c.Selector != "" {
 		out = append(out, c.Selector)
 	}
-	for _, field := range def.Search.Fields {
-		if field.Selector != "" {
-			out = append(out, field.Selector)
+	for _, fe := range def.Search.Fields.Ordered() {
+		if fe.Block.Selector != "" {
+			out = append(out, fe.Block.Selector)
 		}
 	}
 	return out

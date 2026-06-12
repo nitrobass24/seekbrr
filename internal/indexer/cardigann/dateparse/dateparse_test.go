@@ -372,8 +372,8 @@ var knownUnsupported = map[string]struct{}{}
 func collectDateFormats(defs []*loader.Definition) map[string]int {
 	counts := map[string]int{}
 	for _, def := range defs {
-		for _, field := range def.Search.Fields {
-			tallyFilters(counts, field.Filters)
+		for _, fe := range def.Search.Fields.Ordered() {
+			tallyFilters(counts, fe.Block.Filters)
 		}
 	}
 	return counts

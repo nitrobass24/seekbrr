@@ -601,7 +601,7 @@ func TestCorpusFieldCensus(t *testing.T) {
 	hasCategorySource := false
 
 	for _, d := range defs {
-		for key := range d.Search.Fields {
+		for _, key := range d.Search.Fields.Names() {
 			base := standardFieldBase(key)
 			if base == "" {
 				continue // intermediate "_"-prefixed key
