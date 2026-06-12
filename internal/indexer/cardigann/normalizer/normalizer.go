@@ -245,7 +245,7 @@ func applyIDs(r *Release, f map[string]string) {
 
 // firstIMDB reads whichever of the imdb/imdbid aliases is present.
 func firstIMDB(f map[string]string) int64 {
-	if v, ok := f["imdbid"]; ok {
+	if v, ok := f["imdbid"]; ok && strings.TrimSpace(v) != "" {
 		return firstIntRun(v)
 	}
 	return firstIntRun(f["imdb"])
@@ -351,10 +351,10 @@ func validate(r *Release, f map[string]string) error {
 	if strings.TrimSpace(r.Title) == "" {
 		return errNoTitle
 	}
-	if _, ok := f["size"]; !ok {
+	if !hasAny(f, "size") {
 		return errNoSize
 	}
-	if _, ok := f["seeders"]; !ok {
+	if !hasAny(f, "seeders") {
 		return errNoSeeders
 	}
 	if !hasAny(f, "category", "categorydesc") {
