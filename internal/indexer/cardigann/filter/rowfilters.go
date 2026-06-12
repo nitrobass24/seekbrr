@@ -3,6 +3,7 @@ package filter
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 // Row filters operate on the row SET (RowsBlock.Filters), not on a single field
@@ -13,9 +14,12 @@ import (
 // completeness test sees zero unknown filters.
 
 // andMatchSplit mirrors Jackett's MatchQueryStringAND tokenizer: split on runs
-// of non-word characters (.NET Regex "[^\\w]+"). RE2's \w is ASCII-only, which
-// matches the practical effect on the keyword strings used here.
-var andMatchSplit = regexp.MustCompile(`[^\w]+`)
+// of non-word characters (.NET Regex "[^\\w]+"). RE2's bare \w is ASCII-only, so
+// it would treat a whole Cyrillic/Chinese keyword as one non-word run and drop
+// every token, silently disabling the AND match for non-Latin queries. .NET's \w
+// is Unicode-aware (\p{L}\p{Mn}\p{Nd}\p{Pc}); we spell that out so tokenization
+// matches Jackett for non-Latin keywords. For ASCII this equals [A-Za-z0-9_].
+var andMatchSplit = regexp.MustCompile(`[^\p{L}\p{Mn}\p{Nd}\p{Pc}]+`)
 
 // andMatchStopwords are the short words Jackett drops from the keyword set
 // before requiring an AND-match.
@@ -38,7 +42,10 @@ func AndMatch(title, keywords string) bool {
 	lowerTitle := strings.ToLower(title)
 	for _, raw := range andMatchSplit.Split(keywords, -1) {
 		tok := strings.ToLower(raw)
-		if len(tok) <= 1 {
+		// Jackett drops tokens of length ≤1 by CHARACTER count (.NET string.Length),
+		// so count runes, not bytes, or a single Cyrillic/CJK token (2–3 bytes)
+		// would survive where Jackett discards it.
+		if utf8.RuneCountInString(tok) <= 1 {
 			continue
 		}
 		if _, stop := andMatchStopwords[tok]; stop {

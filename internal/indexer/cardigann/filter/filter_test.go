@@ -336,6 +336,12 @@ func TestRowFilters(t *testing.T) {
 		{name: "case insensitive", title: "BIG BUCK BUNNY", keywords: "buck bunny", want: true},
 		{name: "stopwords ignored", title: "Matrix", keywords: "the matrix and an", want: true},
 		{name: "short tokens ignored", title: "Matrix", keywords: "a matrix x", want: true},
+		// Non-Latin parity (.NET \w is Unicode-aware): Cyrillic/Chinese keywords
+		// must tokenize as words and AND-match, not be dropped as "non-word".
+		{name: "cyrillic all present", title: "Москва Слезам Не Верит 1980", keywords: "москва верит", want: true},
+		{name: "cyrillic missing token", title: "Москва 1980", keywords: "москва берлин", want: false},
+		{name: "chinese all present", title: "流浪地球 2019 1080p", keywords: "流浪地球", want: true},
+		{name: "chinese missing token", title: "流浪地球 2019", keywords: "复仇者", want: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
