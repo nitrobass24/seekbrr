@@ -150,11 +150,45 @@ func TestParseInvalid(t *testing.T) {
 
 func TestParseScalarRejectsNonScalar(t *testing.T) {
 	t.Parallel()
-	// A mapping where the schema permits a scalar union must be rejected by
-	// the schema before the typed decode runs.
-	data := []byte("id: x\n")
+	// An otherwise-complete document whose categorymapping id (a scalar union,
+	// oneOf integer|string) is assigned a mapping must be rejected by the
+	// schema before the typed decode runs. The doc is schema-complete so the
+	// only failure is the non-scalar union value, not a missing field.
+	data := []byte(`---
+id: scalar_reject
+name: Scalar Reject
+description: "categorymapping id is a non-scalar mapping"
+language: en-US
+type: private
+encoding: UTF-8
+links:
+  - https://example.invalid/
+caps:
+  categorymappings:
+    - cat: Movies
+      id:
+        nested: map
+  modes:
+    search: [q]
+search:
+  path: /browse.php
+  rows:
+    selector: tr
+  fields:
+    title:
+      selector: a
+    category:
+      selector: a.cat
+    download:
+      selector: a.dl
+      attribute: href
+    size:
+      selector: td.size
+    seeders:
+      selector: td.seeders
+`)
 	if _, err := Parse(data); err == nil {
-		t.Fatal("Parse of incomplete document = nil error, want error")
+		t.Fatal("Parse of categorymapping id as a mapping = nil error, want error")
 	}
 }
 
