@@ -98,6 +98,10 @@ config and exits, and the Torznab handler has no production caller.)
 Phase 3 "search real trackers end-to-end" goal.
 
 - [ ] 5 real trackers, live login/session, gentle rate
+- [ ] **Robustness proof** (carried from Phase 3, which is verified offline only): a real
+      Sonarr/Radarr parses the served caps and completes search → **grab** end-to-end against the live
+      trackers (not just a 200 feed), and an offline serializer fuzz/property test asserts arbitrary
+      `[]*Release` (scraped-data shapes) always produce well-formed, namespace-bindable XML and never panic
 - [ ] **Lazy login**: log in only when a search response looks logged-out (Jackett's behavior), then
       retry once — replacing the eager once-per-Engine login established in Phase 2 (which logs in on
       the first search regardless; see `parity/testdata/README.md` "Eager login")
