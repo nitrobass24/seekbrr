@@ -121,9 +121,10 @@ func resolveOptions(def *loader.Definition, opts []Option) options {
 	if o.clock == nil {
 		o.clock = time.Now
 	}
-	if o.config == nil {
-		o.config = map[string]string{}
-	}
+	// Seed .Config from the definition's settings defaults, then overlay the
+	// caller's explicit config so user-supplied values win — matching Jackett,
+	// where a request template reads the setting Default until the user sets it.
+	o.config = mergeConfig(DefaultConfig(def), o.config)
 	if o.baseURL == "" {
 		o.baseURL = firstLink(def)
 	}
