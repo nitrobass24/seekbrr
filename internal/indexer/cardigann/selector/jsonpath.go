@@ -6,17 +6,16 @@ import (
 	"strings"
 )
 
-// resolveRowsArray resolves rows.selector to a JSON array. The selector is "$"
-// (the root, which must itself be the array) or a dotted/indexed path to an
-// array. ok is false when the path is absent or does not resolve to an array;
-// the caller maps that to Jackett's "0 rows" vs error branch. Jackett strips a
-// trailing ":filter" before SelectToken; we accept the bare path subset the
-// corpus uses (no JSON filters on rows.selector appear in the snapshot).
+// resolveRowsArray resolves rows.selector to a JSON array and applies its
+// pseudo-selector filters. The selector is a path ("$" / dotted) to an array,
+// optionally followed by :has/:not/:contains conditions that Jackett applies to
+// each element (JsonParseRowsSelector: SelectToken(pathBeforeFirstColon), then
+// .Where(JsonParseFieldSelector(element, rest) != null)). ok is false when the
+// path is absent or is not an array; the caller maps that to Jackett's "0 rows"
+// vs error branch.
 func resolveRowsArray(root any, selector string) ([]any, bool, error) {
-	path := rowsPath(selector)
-
 	target := root
-	if path != "" {
+	if path := rowsPath(selector); path != "" {
 		v, ok := resolvePath(root, path)
 		if !ok {
 			return nil, false, nil
@@ -28,12 +27,24 @@ func resolveRowsArray(root any, selector string) ([]any, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
-	return arr, true, nil
+
+	remainder := rowsFilters(selector)
+	if remainder == "" {
+		return arr, true, nil
+	}
+	filtered := make([]any, 0, len(arr))
+	for _, e := range arr {
+		if _, ok := jsonFieldSelector(e, remainder); ok {
+			filtered = append(filtered, e)
+		}
+	}
+	return filtered, true, nil
 }
 
 // rowsPath normalizes a rows.selector into a resolvable path: "$" and "$." mean
 // the root (empty path); a leading "." or "$." prefix is trimmed; a trailing
-// ":..." JSON filter (rare/absent in the snapshot) is dropped.
+// ":..." pseudo-selector (applied by resolveRowsArray, not part of the path) is
+// dropped.
 func rowsPath(selector string) string {
 	s := strings.TrimSpace(selector)
 	if i := strings.IndexByte(s, ':'); i >= 0 {
@@ -41,6 +52,17 @@ func rowsPath(selector string) string {
 	}
 	s = strings.TrimPrefix(s, "$")
 	return trimDotPrefix(s)
+}
+
+// rowsFilters returns the pseudo-selector remainder of a rows.selector (from the
+// first ':' to the end), or "" when the selector is a bare path. It is the
+// per-element condition string Jackett feeds to JsonParseFieldSelector.
+func rowsFilters(selector string) string {
+	s := strings.TrimSpace(selector)
+	if i := strings.IndexByte(s, ':'); i >= 0 {
+		return s[i:]
+	}
+	return ""
 }
 
 // resolvePath walks a Newtonsoft-style SelectToken path over a JSON value decoded

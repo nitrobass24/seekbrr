@@ -31,7 +31,15 @@ func (e *Engine) ParseJSON(body []byte) (*Document, error) {
 }
 
 func (n *jsonNode) query(sel string) (node, bool, error) {
-	v, ok := resolvePath(n.value, trimDotPrefix(sel))
+	// Jackett handleJsonSelector first resolves the pseudo-selector conditions
+	// (:has/:not/:contains) via JsonParseFieldSelector to get the field PATH, then
+	// SelectToken(path) reads the value. A plain dotted path has no filters, so
+	// jsonFieldSelector reduces to a path-existence check (the previous behavior).
+	path, ok := jsonFieldSelector(n.value, trimDotPrefix(sel))
+	if !ok {
+		return nil, false, nil
+	}
+	v, ok := resolvePath(n.value, path)
 	if !ok {
 		return nil, false, nil
 	}
