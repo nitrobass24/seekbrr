@@ -56,7 +56,7 @@ decoupled.
   - [ ] non-Latin-script (regexp2 path)
   - [x] freeleech (download/uploadvolumefactor)
   - [x] multi-category
-  - [ ] date-heavy (multiple .NET formats + relative)
+  - [x] date-heavy (multiple .NET formats + relative)
   - [x] magnet-only (magnet/infohash synthesis)
   - [ ] download-link pre-request
 - [ ] **Success criteria met:** 100% defs load w/o panic · zero silent schema failures (triaged to a
