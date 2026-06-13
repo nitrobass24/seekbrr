@@ -283,6 +283,43 @@ func TestExecute_OnlineReplay(t *testing.T) {
 	}
 }
 
+// TestSearch_LoginMemoized proves login runs at most once per Engine: the def
+// has a login block and no login.test, so without memoization every Search would
+// re-run the login GET. After two searches exactly one /login.php request must
+// have been issued (the search request hits /browse twice).
+func TestSearch_LoginMemoized(t *testing.T) {
+	t.Parallel()
+
+	def := loadFixtureDef(t, "login_memo.yml")
+	doer := &engineReplay{body: string(readBody(t, "login_memo.html"))}
+	eng, err := NewEngine(def, WithClock(fixedClock()), WithDoer(doer))
+	if err != nil {
+		t.Fatalf("NewEngine: %v", err)
+	}
+
+	for i := 0; i < 2; i++ {
+		if _, err := eng.Search(Query{Keywords: "memo"}); err != nil {
+			t.Fatalf("Search %d: %v", i, err)
+		}
+	}
+
+	loginHits, searchHits := 0, 0
+	for _, req := range doer.requests {
+		switch req.URL.Path {
+		case "/login.php":
+			loginHits++
+		case "/browse":
+			searchHits++
+		}
+	}
+	if loginHits != 1 {
+		t.Errorf("login requests = %d, want 1 (memoized across searches)", loginHits)
+	}
+	if searchHits != 2 {
+		t.Errorf("search requests = %d, want 2 (one per Search)", searchHits)
+	}
+}
+
 func assertTitle(t *testing.T, got, want string) {
 	t.Helper()
 	if got != want {

@@ -70,6 +70,9 @@ decoupled.
 ## Phase 4 — Live smoke (closes the MVP)
 
 - [ ] 5 real trackers, live login/session, gentle rate
+- [ ] **Lazy login**: log in only when a search response looks logged-out (Jackett's behavior), then
+      retry once — replacing the eager once-per-Engine login established in Phase 2 (which logs in on
+      the first search regardless; see `parity/testdata/README.md` "Eager login")
 - [ ] Fetch/auth matrix rows as available: Cloudflare/FlareSolverr (pluggable solver) · 2FA/manual-cookie
 - [ ] Docker image + config file
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	stdhttp "net/http"
+	"sync"
 	"time"
 
 	"github.com/autobrr/harbrr/internal/indexer/cardigann/dateparse"
@@ -45,6 +46,10 @@ type Engine struct {
 	login   *login.Executor
 	doer    search.Doer
 	baseURL string
+
+	// loginMu guards the once-per-Engine login memoization (ensureSession).
+	loginMu  sync.Mutex
+	loggedIn bool
 }
 
 // options collects the configurable construction inputs before NewEngine wires
@@ -194,7 +199,7 @@ func (e *Engine) Search(query Query) ([]*Release, error) {
 	if e.doer == nil {
 		return nil, fmt.Errorf("cardigann: Search for %q requires WithDoer (use ParseResponse for offline extraction)", e.def.ID)
 	}
-	if err := e.login.EnsureLoggedIn(e.def); err != nil {
+	if err := e.ensureSession(); err != nil {
 		return nil, fmt.Errorf("cardigann: login for %q: %w", e.def.ID, err)
 	}
 	releases, err := search.Execute(e.def, query, e.login.Session(), e.doer, e.deps)
@@ -202,6 +207,26 @@ func (e *Engine) Search(query Query) ([]*Release, error) {
 		return nil, fmt.Errorf("cardigann: search for %q: %w", e.def.ID, err)
 	}
 	return releases, nil
+}
+
+// ensureSession logs in at most once per Engine. Jackett logs in at configure
+// time and reuses the session across searches; harbrr defers login to the first
+// search and memoizes it, so a reused Engine does not re-run the login sequence
+// on every query (which, for the many private defs without a login.test block,
+// would mean a full login POST per search — a live login-rate hazard). Detecting
+// an expired session in a search response and re-logging-in is the Phase 4
+// lazy-login item; until then the session is established once.
+func (e *Engine) ensureSession() error {
+	e.loginMu.Lock()
+	defer e.loginMu.Unlock()
+	if e.loggedIn {
+		return nil
+	}
+	if err := e.login.EnsureLoggedIn(e.def); err != nil {
+		return err //nolint:wrapcheck // Search wraps with the def id + "login for".
+	}
+	e.loggedIn = true
+	return nil
 }
 
 // ParseResponse is the offline extraction half: parse a saved response body into
