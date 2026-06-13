@@ -1,6 +1,7 @@
 package parity
 
 import (
+	"bytes"
 	"flag"
 	"os"
 	"path/filepath"
@@ -55,6 +56,15 @@ func runCase(t *testing.T, dir string) {
 
 	golden := filepath.Join(dir, c.GoldenFile())
 	if *update {
+		// A jackett-port golden is the engine's homework, not its answer key:
+		// its values must be re-derived from Jackett's own assertions, never
+		// rewritten from harbrr's current output. Refuse to -update it.
+		if c.GoldenSource == SourceJackettPort {
+			t.Fatalf("refusing to -update jackett-port golden for %q: re-derive it from Jackett's CardigannIndexer*Tests.cs assertions, not from harbrr output", c.Name)
+		}
+		if isEmptyGolden(got) {
+			t.Fatalf("refusing to write an empty golden for %q: zero releases usually means an extraction failure, which an empty golden would mask", c.Name)
+		}
 		if err := os.WriteFile(golden, got, 0o600); err != nil {
 			t.Fatalf("writing golden: %v", err)
 		}
@@ -65,10 +75,21 @@ func runCase(t *testing.T, dir string) {
 	if err != nil {
 		t.Fatalf("reading golden %s (run with -update once the output is verified against the oracle): %v", golden, err)
 	}
+	// A committed empty golden is a vacuity hole — a real extraction regression to
+	// zero releases would pass against it. No fixture should expect no releases.
+	if isEmptyGolden(want) {
+		t.Errorf("golden for %q is an empty release list; a fixture must produce >=1 release for the comparison to be meaningful", c.Name)
+	}
 	if string(got) != string(want) {
 		t.Errorf("parity mismatch for %q [archetype=%s source=%s]\n--- got ---\n%s\n--- want ---\n%s",
 			c.Name, c.Archetype, c.GoldenSource, got, want)
 	}
+}
+
+// isEmptyGolden reports whether a golden encodes zero releases ("[]"), which the
+// harness rejects so a regression that drops every release cannot pass vacuously.
+func isEmptyGolden(b []byte) bool {
+	return string(bytes.TrimSpace(b)) == "[]"
 }
 
 // caseDirs returns every testdata subdirectory holding a case.yml.
