@@ -1,9 +1,9 @@
-# seekbrr — design & technical plan
+# harbrr — design & technical plan
 
-**seekbrr is a lightweight, Go-native Jackett/Prowlarr-style search provider built for the autobrr
+**harbrr is a lightweight, Go-native Jackett/Prowlarr-style search provider built for the autobrr
 ecosystem — starting from Cardigann compatibility instead of a new tracker format.**
 
-> Status: design / pre-build. Built first in `nitrobass24/seekbrr` to prove the core, then intended
+> Status: design / pre-build. Built first in `nitrobass24/harbrr` to prove the core, then intended
 > to move to the **autobrr org** once viable and with the team's buy-in.
 > License: **GPL-2.0-or-later** (matches autobrr / qui).
 
@@ -11,9 +11,9 @@ ecosystem — starting from Cardigann compatibility instead of a new tracker for
 
 ## 1. Executive summary
 
-seekbrr gives the **autobrr family a native indexer search/scrape provider** — the role the family
+harbrr gives the **autobrr family a native indexer search/scrape provider** — the role the family
 currently outsources to **Prowlarr**, an external .NET service its own documentation tells users to
-install. seekbrr fills that slot natively: it exposes Torznab/Newznab and on-demand search over the
+install. harbrr fills that slot natively: it exposes Torznab/Newznab and on-demand search over the
 same private and public trackers, built on the substrate the family already maintains (`rls`,
 `go-qbittorrent`, the qui patterns). It is a **single binary for normal operation**; only
 anti-bot-protected indexers need an optional external solver (see §6, §9).
@@ -52,10 +52,10 @@ Two gaps:
    .NET/React app the family can't easily extend. The integrations that matter here — pushing to
    autobrr, acting as a cross-seed backend, first-class qBittorrent — are not upstream priorities.
 
-seekbrr makes the search/scrape function **native to the family**, on a stack it already maintains,
+harbrr makes the search/scrape function **native to the family**, on a stack it already maintains,
 and open to the integrations Prowlarr resists.
 
-## 3. What seekbrr is / is not
+## 3. What harbrr is / is not
 
 **Is:**
 
@@ -67,7 +67,7 @@ and open to the integrations Prowlarr resists.
 
 **Is not:**
 
-- An **IRC announce** tool — that is autobrr's job; seekbrr integrates with it, not replaces it.
+- An **IRC announce** tool — that is autobrr's job; harbrr integrates with it, not replaces it.
 - A **torrent creator** (mkbrr), an **uploader** (upbrr), or a **qBittorrent UI** (qui).
 - A **new or competing definition format** — it speaks Cardigann deliberately, for interoperability.
 - A **full Prowlarr clone**, or a drop-in for every Prowlarr feature on day one. (See §13 for how the
@@ -117,7 +117,7 @@ In rough order of how much each can sink the project:
    it moves early in the roadmap (§12). Manual cookie injection is the universal fallback.
 6. **Anti-bot upkeep.** A perpetual arms race where Go offers no advantage. *Mitigation:* **delegate
    to FlareSolverr** behind a pluggable solver interface, reached only for protected indexers.
-7. **Secret handling.** seekbrr holds passkeys, cookies, API keys, and download tokens — a real
+7. **Secret handling.** harbrr holds passkeys, cookies, API keys, and download tokens — a real
    attack surface that an indexer manager must take seriously from the start (§9).
 
 ## 6. Architecture
@@ -140,11 +140,11 @@ In rough order of how much each can sink the project:
 
 The **provider pattern** (Prowlarr's `ThingiProvider`) is carried over: everything pluggable is a
 provider with a typed settings schema, validation, and a test action — a small set of Go interfaces
-plus a registry, and exactly the seam where seekbrr can be open where Prowlarr is conservative.
+plus a registry, and exactly the seam where harbrr can be open where Prowlarr is conservative.
 
 ### Stack
 
-| Concern | Prowlarr | seekbrr |
+| Concern | Prowlarr | harbrr |
 |---|---|---|
 | Language / runtime | C# / .NET | Go, single static binary, no cgo |
 | HTTP router | ASP.NET | `chi` |
@@ -160,7 +160,7 @@ plus a registry, and exactly the seam where seekbrr can be open where Prowlarr i
 ### Project layout (sketch)
 
 ```
-cmd/seekbrr/            # entrypoint (cobra/viper)
+cmd/harbrr/            # entrypoint (cobra/viper)
 internal/
   web/ swagger/         # chi router; openapi.yaml (//go:embed) + Swagger UI + drift tests
   indexer/
@@ -246,7 +246,7 @@ re-vendor). Validation is almost entirely **offline**:
   silently dropped — §12).
 - **Golden-file fixtures**, one per engine primitive (each filter, template function, date format,
   selector extension).
-- **Differential testing** on the few trackers you have accounts on: run Jackett and seekbrr over the
+- **Differential testing** on the few trackers you have accounts on: run Jackett and harbrr over the
   same saved response, diff.
 - **Live smoke canaries** — integration checks, not the parity oracle.
 
@@ -257,16 +257,16 @@ The bar for "parity is real" is the compatibility matrix in §12.
 Two distinct contracts, often conflated:
 
 - **Torznab / Newznab — the *arr-facing contract.** XML, defined by the Torznab/Newznab spec, not by
-  seekbrr's OpenAPI. It is what Sonarr/Radarr and autobrr's Feeds actually consume. **Capabilities and
+  harbrr's OpenAPI. It is what Sonarr/Radarr and autobrr's Feeds actually consume. **Capabilities and
   category correctness is an MVP gate, not just result-XML shape** — Sonarr/Radarr integration
   failures usually trace to caps/category behavior, not the result envelope.
-- **seekbrr's own management API — OpenAPI/Swagger.** A hand-authored `openapi.yaml`, `//go:embed`-ed,
+- **harbrr's own management API — OpenAPI/Swagger.** A hand-authored `openapi.yaml`, `//go:embed`-ed,
   served with Swagger UI, with drift tests asserting spec-matches-handlers (the qui pattern). This
   governs configuration/management, not the *arr integration.
 
 ## 9. Security model
 
-seekbrr stores tracker **passkeys, session cookies, API/auth keys, and download tokens** — among the
+harbrr stores tracker **passkeys, session cookies, API/auth keys, and download tokens** — among the
 most sensitive data a self-hosted app can hold, and the place a careless indexer manager leaks first.
 The posture:
 
@@ -308,21 +308,21 @@ Vendoring a corpus is not a one-time copy — it needs an operating policy:
   a visible skip-list, never silently dropped**; users can also disable a def by `id`.
 - **Pinning & drift.** The embedded snapshot is pinned to the binary version; individual defs are
   pinned/overridden via the drop-in dir. Drop-in defs are defensively parsed with unknown fields
-  tolerated (no version negotiation — seekbrr embeds lockstep like Jackett).
+  tolerated (no version negotiation — harbrr embeds lockstep like Jackett).
 
 ## 11. Autobrr family integration
 
-This section is the spine of the project, not an appendix: it is what makes seekbrr a family member
+This section is the spine of the project, not an appendix: it is what makes harbrr a family member
 rather than a Prowlarr clone. Guiding principle: **family-native first, Prowlarr-compatible second** —
 Torznab and *arr app-sync are the compatibility surface; the center of gravity is integration with
 autobrr, qui, and cross-seed.
 
 ### Division of labor
 
-| Tool | Owns | Seam with seekbrr | seekbrr does NOT |
+| Tool | Owns | Seam with harbrr | harbrr does NOT |
 |---|---|---|---|
-| **autobrr** | real-time IRC announce + feed polling → filters → actions | seekbrr is autobrr's Torznab/Newznab **feed + search provider** (the Prowlarr slot); shared tracker identity | …parse IRC announces |
-| **qui** | qBittorrent management UI | shared `go-qbittorrent`; seekbrr pushes grabs, qui manages them | …reimplement qBit management/UI |
+| **autobrr** | real-time IRC announce + feed polling → filters → actions | harbrr is autobrr's Torznab/Newznab **feed + search provider** (the Prowlarr slot); shared tracker identity | …parse IRC announces |
+| **qui** | qBittorrent management UI | shared `go-qbittorrent`; harbrr pushes grabs, qui manages them | …reimplement qBit management/UI |
 | **mkbrr** | torrent **creation** | shares the tracker-identity layer | …create torrents |
 | **upbrr** | **upload** automation | shares tracker identity + category maps | …upload |
 | **rls** | release-name parsing | adopted as-is (§6) | …port Prowlarr's Parser |
@@ -332,9 +332,9 @@ autobrr, qui, and cross-seed.
 ```
                     ┌─ IRC announce  (live, ms latency) ───────────────→ autobrr ─┐
  trackers ──────────┤                                                   (filters   ├─→ qBittorrent ──→ qui
- (one shared id,    └─ HTTP feed/search (seekbrr) ──→ autobrr Feeds ────→ + actions)│   (go-qbittorrent)   (manage/UI)
+ (one shared id,    └─ HTTP feed/search (harbrr) ──→ autobrr Feeds ────→ + actions)│   (go-qbittorrent)   (manage/UI)
   one credential set)                                                              ├─→ *arr apps (Sonarr/Radarr/…)
-                          seekbrr also ──→ Torznab/Newznab + on-demand search ──────┘
+                          harbrr also ──→ Torznab/Newznab + on-demand search ──────┘
                           ├─→ *arr app-sync        (Prowlarr-compat)
                           └─→ cross-seed backend   (multi-tracker search)
  upload side:  seedbox ──→ mkbrr (create) ──→ upbrr (upload spec) ──→ tracker
@@ -342,15 +342,15 @@ autobrr, qui, and cross-seed.
 
 ### Integration points
 
-1. **seekbrr → autobrr feeds: drop-in today, native tomorrow.** autobrr already consumes Generic
-   Torznab/Newznab; point it at seekbrr instead of Prowlarr and nothing else changes. The upgrade only
+1. **harbrr → autobrr feeds: drop-in today, native tomorrow.** autobrr already consumes Generic
+   Torznab/Newznab; point it at harbrr instead of Prowlarr and nothing else changes. The upgrade only
    the family can do: a **native push** path so newly-scraped releases reach autobrr's filters
    immediately instead of waiting on RSS polling.
 2. **Shared tracker identity / registry.** One tracker `id` plus one credential entry shared between
-   autobrr's IRC defs and seekbrr's Cardigann defs, removing the by-hand "External identifier"
+   autobrr's IRC defs and harbrr's Cardigann defs, removing the by-hand "External identifier"
    mapping autobrr users do today.
-3. **seekbrr ↔ qBittorrent / qui.** Grabs push via `go-qbittorrent`; qui manages the torrents.
-4. **seekbrr as the cross-seed search backend.** cross-seed needs a Torznab indexer source — seekbrr
+3. **harbrr ↔ qBittorrent / qui.** Grabs push via `go-qbittorrent`; qui manages the torrents.
+4. **harbrr as the cross-seed search backend.** cross-seed needs a Torznab indexer source — harbrr
    provides it natively.
 
 ### Shared tracker registry (longer-term)
@@ -358,7 +358,7 @@ autobrr, qui, and cross-seed.
 Each brr tool encodes a *different facet* of the same trackers, so every new tracker is described
 three or four times. The right shape is a small **shared identity layer** (tracker `id`,
 names/aliases, domains, type/privacy, auth-key schema, category map) with **per-tool facet files keyed
-by that `id`**, in one community repo (e.g. `autobrr/trackers`). seekbrr does not block on it: vendor
+by that `id`**, in one community repo (e.g. `autobrr/trackers`). harbrr does not block on it: vendor
 Jackett now, design the loader so the search facet could later live in the registry, seed the `id`
 layer over time. (Precedent: autobrr's defs descend from autodl-irssi `.tracker` files; Cardigann is
 already shared across Jackett, Prowlarr, and Sonarr v3.)
@@ -432,10 +432,10 @@ app sync.
 
 ## 14. Licensing
 
-seekbrr is **GPL-2.0-or-later**, matching autobrr and qui, which is compatible with **Jackett's
+harbrr is **GPL-2.0-or-later**, matching autobrr and qui, which is compatible with **Jackett's
 GPL-2.0** corpus — that compatibility is why definitions are vendored from Jackett. Note the
 distinction that actually matters: Prowlarr *the application* is GPL-3.0, but that is **irrelevant**
-here because seekbrr uses no Prowlarr code; the operative fact is that the **`Prowlarr/Indexers`
+here because harbrr uses no Prowlarr code; the operative fact is that the **`Prowlarr/Indexers`
 definitions repo carries no license** (all rights reserved), so those defs are not redistributable.
 The one Prowlarr-only tracker and any user/custom defs go through the local drop-in directory instead,
 keeping distribution clean. (Not legal advice.)
@@ -470,7 +470,7 @@ Prowlarr-only; near-identical engineering profile):
 Cardigann lineage: an original Go `cardigann` seeded the format; **Jackett** grew the corpus (GPL-2.0,
 definitions bundled in-app, lockstep with its engine — hence no schema-version negotiation);
 **Prowlarr** forked its own `Indexers` repo, ported the engine to .NET, and formalized v1–v11 schema
-versions *because* it fetches definitions at runtime and must negotiate engine/def skew. seekbrr
+versions *because* it fetches definitions at runtime and must negotiate engine/def skew. harbrr
 embeds and vendors like Jackett, so it needs no version negotiation — only defensive parse-and-skip
 on drop-in defs.
 

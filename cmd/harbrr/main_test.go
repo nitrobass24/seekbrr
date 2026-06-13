@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/autobrr/seekbrr/internal/version"
+	"github.com/autobrr/harbrr/internal/version"
 )
 
 // execute runs the command tree with args and returns combined stdout/stderr.

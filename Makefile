@@ -1,6 +1,6 @@
 SHELL       := /usr/bin/env bash
-MODULE      := github.com/autobrr/seekbrr
-BINARY      := seekbrr
+MODULE      := github.com/autobrr/harbrr
+BINARY      := harbrr
 BIN_DIR     := bin
 PKG         := ./...
 
@@ -19,11 +19,11 @@ LDFLAGS     := -s -w \
 help:
 	@grep -E '^##' $(MAKEFILE_LIST) | sed -E 's/## //'
 
-## build: compile the binary to bin/seekbrr
+## build: compile the binary to bin/harbrr
 .PHONY: build
 build:
 	@mkdir -p $(BIN_DIR)
-	go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN_DIR)/$(BINARY) ./cmd/seekbrr
+	go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN_DIR)/$(BINARY) ./cmd/harbrr
 
 ## backend: alias for build
 .PHONY: backend

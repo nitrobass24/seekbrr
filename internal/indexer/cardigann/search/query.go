@@ -1,0 +1,161 @@
+package search
+
+import (
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/autobrr/harbrr/internal/indexer/cardigann/template"
+)
+
+// Query is the parsed search request the engine drives a definition with. It is
+// the harbrr-internal equivalent of Jackett's TorznabQuery, reduced to the
+// fields the request-building and row-filter stages read. Empty fields render to
+// "" in templates (matching Jackett's null-to-empty coercion), so a zero Query is
+// a valid "raw RSS" search.
+type Query struct {
+	// Keywords is the free-text search term (Jackett .Query.Q / .Keywords).
+	Keywords string
+	// Categories is the resolved tracker category id list ({{ .Categories }}).
+	Categories []string
+
+	// ID-style query params. A non-empty value here both feeds the request
+	// templates and gates the andmatch row filter off (Jackett skips andmatch for
+	// id searches), matching ParseRowFilters.
+	IMDBID   string
+	TMDBID   string
+	TVDBID   string
+	TVMazeID string
+	TraktID  string
+	DoubanID string
+	RageID   string
+
+	// Episode/series params.
+	Season string
+	Ep     string
+	Year   string
+
+	// Music/book params.
+	Artist    string
+	Album     string
+	Label     string
+	Track     string
+	Author    string
+	BookTitle string
+}
+
+// isIDSearch reports whether any ID-style param is set. Jackett skips the
+// andmatch row filter for id searches (ParseRowFilters), so the engine consults
+// this to decide whether to apply andmatch.
+func (q Query) isIDSearch() bool {
+	return q.IMDBID != "" || q.TMDBID != "" || q.TVDBID != "" ||
+		q.TVMazeID != "" || q.TraktID != "" || q.DoubanID != "" || q.RageID != ""
+}
+
+// keywords reproduces Jackett's KeywordTokens join: Q + Series + Movie + Year +
+// Episode, whitespace-joined. harbrr models Keywords as the already-joined term,
+// so this simply trims; the Year token is appended when present (the only extra
+// token the corpus request templates rely on beyond the bare term).
+func (q Query) keywords() string {
+	tokens := make([]string, 0, 2)
+	if t := strings.TrimSpace(q.Keywords); t != "" {
+		tokens = append(tokens, t)
+	}
+	if y := strings.TrimSpace(q.Year); y != "" {
+		tokens = append(tokens, y)
+	}
+	return strings.Join(tokens, " ")
+}
+
+// queryMap renders the Query fields into the .Query.<name> template namespace,
+// using Jackett's exact variable keys so request templates resolve identically.
+// Absent fields are simply not set, so missingkey=zero makes them "" / falsy.
+func (q Query) queryMap() map[string]string {
+	m := map[string]string{}
+	set := func(k, v string) {
+		if v != "" {
+			m[k] = v
+		}
+	}
+	set("Q", q.Keywords)
+	set("Keywords", q.keywords())
+	set("IMDBID", q.IMDBID)
+	set("TMDBID", q.TMDBID)
+	set("TVDBID", q.TVDBID)
+	set("TVMazeID", q.TVMazeID)
+	set("TraktID", q.TraktID)
+	set("DoubanID", q.DoubanID)
+	set("TVRageID", q.RageID)
+	set("Season", q.Season)
+	set("Ep", q.Ep)
+	set("Episode", q.Ep)
+	set("Year", q.Year)
+	set("Artist", q.Artist)
+	set("Album", q.Album)
+	set("Label", q.Label)
+	set("Track", q.Track)
+	set("Author", q.Author)
+	set("Title", q.BookTitle)
+	q.setQueryFlags(m)
+	return m
+}
+
+// setQueryFlags reproduces Jackett's boolean .Query.Is* sentinels that request
+// templates branch on (e.g. {{ if .Query.IsImdbQuery }}). A true flag is the
+// string "True"; a false flag is left absent (Jackett sets it to null), so
+// missingkey=zero renders it "" / falsy.
+func (q Query) setQueryFlags(m map[string]string) {
+	if q.IMDBID != "" {
+		m["IsImdbQuery"] = trueSentinel
+	}
+	if q.TMDBID != "" {
+		m["IsTmdbQuery"] = trueSentinel
+	}
+	if q.TVDBID != "" {
+		m["IsTvdbQuery"] = trueSentinel
+	}
+	if q.isIDSearch() {
+		m["IsIdSearch"] = trueSentinel
+	}
+}
+
+// trueSentinel mirrors Jackett's "True" string used for boolean query flags.
+const trueSentinel = "True"
+
+// newContext builds a fresh template.Context for one Eval. A fresh context per
+// call is required because template.Eval mutates it (whitespace normalization).
+// config supplies the .Config namespace (and .Config.sitelink); query supplies
+// .Query / .Keywords / .Categories; result seeds the growing per-row .Result map;
+// clock seeds the .Today namespace ({{ .Today.Year }}). A nil clock defaults to
+// time.Now so .Today is never silently empty.
+func newContext(config, query, result map[string]string, keywords string, categories []string, clock func() time.Time) *template.Context {
+	ctx := template.NewContext()
+	for k, v := range config {
+		ctx.Config[k] = v
+	}
+	for k, v := range query {
+		ctx.Query[k] = v
+	}
+	for k, v := range result {
+		ctx.Result[k] = v
+	}
+	ctx.Keywords = keywords
+	ctx.Categories = categories
+	ctx.Today = today(clock)
+	return ctx
+}
+
+// today renders the .Today namespace from the reference clock. Jackett seeds
+// .Today.Year/Month/Day from DateTime.Now (GetBaseTemplateVariables); the engine
+// injects a deterministic clock so date-defaulting templates are reproducible.
+func today(clock func() time.Time) template.Today {
+	if clock == nil {
+		clock = time.Now
+	}
+	now := clock()
+	return template.Today{
+		Year:  strconv.Itoa(now.Year()),
+		Month: strconv.Itoa(int(now.Month())),
+		Day:   strconv.Itoa(now.Day()),
+	}
+}

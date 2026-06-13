@@ -1,4 +1,4 @@
-// Package parity holds the differential/golden test harness that pins seekbrr's
+// Package parity holds the differential/golden test harness that pins harbrr's
 // engine output to Jackett's. Fixtures live under testdata/: a pair of
 // <name>.input (a saved tracker response) and <name>.golden.json (Jackett's
 // normalized output for the same input). This suite is the gate the engine must
@@ -15,7 +15,7 @@ var ErrNotImplemented = errors.New("cardigann engine not yet implemented")
 // Process runs the engine over a saved tracker response and returns the
 // normalized result as canonical JSON, byte-comparable against a golden file.
 //
-// TODO(seekbrr): invoke the cardigann pipeline (loader -> mapper -> ... ->
+// TODO(harbrr): invoke the cardigann pipeline (loader -> mapper -> ... ->
 // normalizer) and marshal canonically. Keep output deterministic (stable field
 // order, normalized whitespace) so golden comparison is meaningful.
 func Process(input []byte) ([]byte, error) {

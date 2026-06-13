@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/autobrr/seekbrr/internal/config"
-	"github.com/autobrr/seekbrr/internal/logger"
+	"github.com/autobrr/harbrr/internal/config"
+	"github.com/autobrr/harbrr/internal/logger"
 )
 
 func TestNew(t *testing.T) {

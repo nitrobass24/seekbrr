@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/autobrr/seekbrr/internal/version"
+	"github.com/autobrr/harbrr/internal/version"
 )
 
 // newVersionCmd prints the build version string. The root command also exposes
@@ -11,7 +11,7 @@ import (
 func newVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
-		Short: "Print the seekbrr version",
+		Short: "Print the harbrr version",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cmd.Println(version.String())

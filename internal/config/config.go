@@ -1,4 +1,4 @@
-// Package config holds seekbrr's typed runtime configuration and the loader
+// Package config holds harbrr's typed runtime configuration and the loader
 // that assembles it from defaults, a config file, environment variables, and
 // command-line flags. Structured config is always a typed struct — never a
 // map[string]any (see AGENTS.md).
@@ -14,7 +14,7 @@ import (
 // is rendered for logging.
 const redactedMask = "***"
 
-// Config is seekbrr's complete runtime configuration. It starts intentionally
+// Config is harbrr's complete runtime configuration. It starts intentionally
 // small (Phase 0) and grows as consumers — the web server, database, and
 // secrets store — are wired in later phases.
 type Config struct {
@@ -45,7 +45,7 @@ type DatabaseConfig struct {
 
 // SecretsConfig selects the at-rest encryption key source. At most one of
 // EncryptionKey (inline/env) or KeyFile (path) may be set; if neither is set,
-// seekbrr falls back to plaintext with a loud startup warning.
+// harbrr falls back to plaintext with a loud startup warning.
 type SecretsConfig struct {
 	EncryptionKey string `mapstructure:"encryption_key"`
 	KeyFile       string `mapstructure:"key_file"`
@@ -76,12 +76,12 @@ func Defaults() Config {
 }
 
 // DatabasePath returns the configured SQLite path, defaulting to
-// "<DataDir>/seekbrr.db" when unset.
+// "<DataDir>/harbrr.db" when unset.
 func (c Config) DatabasePath() string {
 	if c.Database.Path != "" {
 		return c.Database.Path
 	}
-	return filepath.Join(c.DataDir, "seekbrr.db")
+	return filepath.Join(c.DataDir, "harbrr.db")
 }
 
 // HasSecretKey reports whether an at-rest encryption key source is configured.

@@ -3,15 +3,15 @@ package main
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/autobrr/seekbrr/internal/config"
-	"github.com/autobrr/seekbrr/internal/version"
+	"github.com/autobrr/harbrr/internal/config"
+	"github.com/autobrr/harbrr/internal/version"
 )
 
-// newRootCmd builds the seekbrr command tree: a root carrying the persistent
+// newRootCmd builds the harbrr command tree: a root carrying the persistent
 // configuration flags, plus the serve and version subcommands.
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "seekbrr",
+		Use:           "harbrr",
 		Short:         "Cardigann-compatible Torznab/Newznab search provider for the autobrr family",
 		Version:       version.String(),
 		SilenceUsage:  true,
@@ -20,13 +20,13 @@ func newRootCmd() *cobra.Command {
 
 	d := config.Defaults()
 	pf := root.PersistentFlags()
-	pf.String("config", "", "path to a YAML config file (default: search ./ and ./data for seekbrr.yaml)")
+	pf.String("config", "", "path to a YAML config file (default: search ./ and ./data for harbrr.yaml)")
 	pf.String("host", d.Server.Host, "management-API listen host")
 	pf.Int("port", d.Server.Port, "management-API listen port")
 	pf.String("log-level", d.Log.Level, "log level (trace|debug|info|warn|error)")
 	pf.String("log-format", d.Log.Format, "log format (console|json)")
 	pf.String("data-dir", d.DataDir, "data directory")
-	pf.String("db-path", d.Database.Path, "SQLite database path (default: <data-dir>/seekbrr.db)")
+	pf.String("db-path", d.Database.Path, "SQLite database path (default: <data-dir>/harbrr.db)")
 
 	root.AddCommand(newServeCmd(), newVersionCmd())
 	return root

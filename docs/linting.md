@@ -5,18 +5,18 @@ judgment calls.
 
 ## Formatting
 
-`gofumpt` (a strict superset of gofmt) + `goimports` with local prefix `github.com/autobrr/seekbrr`.
+`gofumpt` (a strict superset of gofmt) + `goimports` with local prefix `github.com/autobrr/harbrr`.
 Run `make fmt`. Stricter than autobrr/qui's plain gofmt, but gofmt-compatible, so the family
 relationship holds.
 
 ## What's enabled and why
 
-The set is autobrr/qui's config (for family consistency) plus seekbrr additions:
+The set is autobrr/qui's config (for family consistency) plus harbrr additions:
 
-- **No god functions (seekbrr additions):** `funlen` (≤80 lines / 50 statements), `gocyclo`
+- **No god functions (harbrr additions):** `funlen` (≤80 lines / 50 statements), `gocyclo`
   (cyclomatic ≤15), `gocognit` (cognitive ≤20), `nestif` (nesting ≤5). The pipeline architecture is
   designed so functions stay small; these keep it honest.
-- **Extra type safety (seekbrr additions):** `forcetypeassert` (no unchecked `x.(T)`), `nilnil`,
+- **Extra type safety (harbrr additions):** `forcetypeassert` (no unchecked `x.(T)`), `nilnil`,
   `wrapcheck`. Plus qui's `errorlint`/`errname`/`exhaustive`/`unconvert` and golangci's defaults
   (`errcheck`, `govet`, `staticcheck`, `unused`, `ineffassign`).
 - **Family inheritance:** `gocritic`, `revive`, `gosec`, `perfsprint`, `prealloc`, `noctx`,

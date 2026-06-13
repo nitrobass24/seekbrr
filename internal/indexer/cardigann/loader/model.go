@@ -172,9 +172,77 @@ type RowsBlock struct {
 	Count                           *SelectorBlock    `yaml:"count,omitempty"`
 }
 
+// FieldEntry is one (key, block) pair from a FieldsBlock, in definition order.
+// Key is the raw YAML key, which may carry modifiers ("title|append").
+type FieldEntry struct {
+	Key   string
+	Block SelectorBlock
+}
+
 // FieldsBlock mirrors FieldsBlock: dynamic keys (title, category, _custom,
 // "title|append", ...) each mapping to a SelectorBlock.
-type FieldsBlock map[string]SelectorBlock
+//
+// Jackett's ParseFields iterates the fields in DEFINITION ORDER and accumulates
+// a per-row Result map as it goes, so a later field's template can read an
+// earlier field via {{ .Result.<name> }}. A plain Go map randomizes iteration
+// and would break that contract, so FieldsBlock preserves the YAML key order via
+// a custom UnmarshalYAML: keys records the order, blocks the values. Read access
+// goes through Ordered/Get/Names; schema validation still runs on the generic
+// decode, unaffected by this typed shape.
+type FieldsBlock struct {
+	keys   []string
+	blocks map[string]SelectorBlock
+}
+
+// UnmarshalYAML decodes a mapping node into an order-preserving FieldsBlock. A
+// YAML mapping node stores its entries as a flat [key0, val0, key1, val1, ...]
+// Content slice in source order, which is exactly the order Jackett relies on.
+// A duplicate key keeps its FIRST position but its LAST value, matching go-yaml's
+// last-wins map semantics while leaving the field loop's order stable.
+func (fb *FieldsBlock) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("fields: expected a mapping, got %s", kindName(node.Kind))
+	}
+	fb.keys = fb.keys[:0]
+	fb.blocks = make(map[string]SelectorBlock, len(node.Content)/2)
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		key := node.Content[i].Value
+		var block SelectorBlock
+		if err := node.Content[i+1].Decode(&block); err != nil {
+			return fmt.Errorf("fields: decoding field %q: %w", key, err)
+		}
+		if _, seen := fb.blocks[key]; !seen {
+			fb.keys = append(fb.keys, key)
+		}
+		fb.blocks[key] = block
+	}
+	return nil
+}
+
+// Ordered returns the field entries in definition (YAML) order.
+func (fb FieldsBlock) Ordered() []FieldEntry {
+	out := make([]FieldEntry, 0, len(fb.keys))
+	for _, k := range fb.keys {
+		out = append(out, FieldEntry{Key: k, Block: fb.blocks[k]})
+	}
+	return out
+}
+
+// Get returns the SelectorBlock for a field key and whether it is present.
+func (fb FieldsBlock) Get(key string) (SelectorBlock, bool) {
+	b, ok := fb.blocks[key]
+	return b, ok
+}
+
+// Names returns the field keys in definition (YAML) order.
+func (fb FieldsBlock) Names() []string {
+	out := make([]string, len(fb.keys))
+	copy(out, fb.keys)
+	return out
+}
+
+// Len reports the number of fields.
+func (fb FieldsBlock) Len() int { return len(fb.keys) }
 
 // DownloadBlock mirrors DownloadBlock.
 type DownloadBlock struct {

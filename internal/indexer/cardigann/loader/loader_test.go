@@ -69,14 +69,16 @@ func TestParseValid(t *testing.T) {
 			name:    "filter args scalar and array normalized to []string",
 			fixture: "html_minimal.yml",
 			check: func(t *testing.T, def *Definition) {
-				catFilters := def.Search.Fields["category"].Filters
+				catBlock, _ := def.Search.Fields.Get("category")
+				catFilters := catBlock.Filters
 				if len(catFilters) != 1 || catFilters[0].Name != "querystring" {
 					t.Fatalf("category filters = %+v", catFilters)
 				}
 				if got := catFilters[0].Args; len(got) != 1 || got[0] != "cat" {
 					t.Errorf("scalar filter args = %v, want [cat]", got)
 				}
-				seedFilters := def.Search.Fields["seeders"].Filters
+				seedBlock, _ := def.Search.Fields.Get("seeders")
+				seedFilters := seedBlock.Filters
 				if len(seedFilters) != 1 {
 					t.Fatalf("seeders filters = %+v", seedFilters)
 				}
@@ -102,11 +104,11 @@ func TestParseValid(t *testing.T) {
 				if len(cats) != 2 || cats[0].String() != "1" || cats[1].String() != "x2" {
 					t.Errorf("path categories = %v, want [1 x2]", cats)
 				}
-				cd := def.Search.Fields["categorydesc"]
+				cd, _ := def.Search.Fields.Get("categorydesc")
 				if cd.Text == nil || cd.Text.String() != "Movies" {
 					t.Errorf("categorydesc text = %v, want Movies", cd.Text)
 				}
-				seeders := def.Search.Fields["seeders"]
+				seeders, _ := def.Search.Fields.Get("seeders")
 				if seeders.Default == nil || seeders.Default.String() != "0" {
 					t.Errorf("seeders default = %v, want 0 (number normalized)", seeders.Default)
 				}

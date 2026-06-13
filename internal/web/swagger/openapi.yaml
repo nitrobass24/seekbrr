@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: seekbrr management API
+  title: harbrr management API
   version: 0.0.0
   description: >
-    seekbrr's own management API (configuration of indexers, secrets, and
+    harbrr's own management API (configuration of indexers, secrets, and
     download clients). This is distinct from the *arr-facing Torznab/Newznab
     XML contract served by internal/torznab; the two evolve independently
     (see docs/architecture.md). Hand-authored, embedded via //go:embed, and

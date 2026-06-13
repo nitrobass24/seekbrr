@@ -1,4 +1,4 @@
-// Package logger builds the zerolog logger from seekbrr's typed config. It is
+// Package logger builds the zerolog logger from harbrr's typed config. It is
 // intentionally small: level + output format only, growing as logging needs do.
 package logger
 
@@ -9,7 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/autobrr/seekbrr/internal/config"
+	"github.com/autobrr/harbrr/internal/config"
 )
 
 // New builds a zerolog.Logger from the log configuration, writing to w. A

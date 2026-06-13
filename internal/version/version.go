@@ -1,4 +1,4 @@
-// Package version holds build/version metadata for seekbrr.
+// Package version holds build/version metadata for harbrr.
 package version
 
 // These are overridden at build time via -ldflags (see the Makefile).

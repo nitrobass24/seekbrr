@@ -11,7 +11,7 @@ import (
 
 	yaml "go.yaml.in/yaml/v3"
 
-	"github.com/autobrr/seekbrr/internal/indexer/definitions"
+	"github.com/autobrr/harbrr/internal/indexer/definitions"
 )
 
 // vendorDir is the subdirectory of the embedded definitions FS that holds the

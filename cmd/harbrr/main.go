@@ -1,4 +1,4 @@
-// Command seekbrr is a Cardigann-compatible Torznab/Newznab search provider for
+// Command harbrr is a Cardigann-compatible Torznab/Newznab search provider for
 // the autobrr family. See docs/ideas.md for the design and docs/plan.md for the
 // build order.
 package main
@@ -10,7 +10,7 @@ import (
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "seekbrr:", err)
+		fmt.Fprintln(os.Stderr, "harbrr:", err)
 		os.Exit(1)
 	}
 }

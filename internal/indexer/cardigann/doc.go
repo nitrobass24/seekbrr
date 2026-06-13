@@ -1,4 +1,4 @@
-// Package cardigann is seekbrr's fresh, from-scratch implementation of the
+// Package cardigann is harbrr's fresh, from-scratch implementation of the
 // Cardigann tracker-definition engine. It is NOT the archived 2018
 // cardigann/cardigann project; it shares only the definition format, which is
 // kept as the interoperability contract with the existing community corpus.

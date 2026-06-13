@@ -1,12 +1,12 @@
 # AGENTS.md
 
-Repo rules for AI agents (Claude Code, etc.) and contributors working on **seekbrr** — a Go,
+Repo rules for AI agents (Claude Code, etc.) and contributors working on **harbrr** — a Go,
 single-binary, Cardigann-compatible Torznab/Newznab search provider for the autobrr family. Read this
 fully before editing. The full design is in `@docs/ideas.md`; the build checklist in `@docs/plan.md`.
 
 ## Prime directive
 
-seekbrr's entire value is **behavioral parity with Jackett's Cardigann engine on the same input**.
+harbrr's entire value is **behavioral parity with Jackett's Cardigann engine on the same input**.
 The build order retires that risk first: **test harness first, engine second, product third**
 (`docs/plan.md`). Do not build product surface (UI, app-sync, migration) before the engine passes its
 parity gate (the "Definition of done" in `docs/ideas.md`).
@@ -16,7 +16,7 @@ parity gate (the "Definition of done" in `docs/ideas.md`).
 - Stay inside the requested scope. Do not implement review-suggested or extra changes without
   explicit approval.
 - Treat other agent / CodeRabbit / reviewer feedback as input to discuss, not automatic action.
-- seekbrr is single-user self-hosted software. Prefer readable, maintainable code over paranoid
+- harbrr is single-user self-hosted software. Prefer readable, maintainable code over paranoid
   guards for impossible states.
 - Work **one `docs/plan.md` item at a time**; check its box only when its tests are green.
 
@@ -28,12 +28,13 @@ parity gate (the "Definition of done" in `docs/ideas.md`).
   (A PreToolUse hook blocks edits here; refreshing the snapshot via `make vendor-defs` is fine.)
 - **NEVER log, print, or commit secrets** — passkeys, cookies, API keys, download tokens. Definitions
   routinely put passkeys in URLs; redact secret query params and `Authorization`/`Cookie` headers in
-  all logs and traces. (gitleaks + a local check run in pre-commit and CI.)
+  all logs and traces. (gitleaks + `scripts/check-no-secrets.sh` run in pre-commit and in CI via
+  `.github/workflows/security.yml`.)
 - **NEVER add AI advertising/attribution/co-author lines** to commits or PRs.
 
 ## Repo map
 
-- Entry: `cmd/seekbrr`
+- Entry: `cmd/harbrr`
 - Engine — a compiler-style pipeline, one package per stage under `internal/indexer/cardigann/`:
   `loader → mapper → template → filter → selector → dateparse → regexadapter → login → search →
   normalizer`; the serializer is `internal/torznab`. Keep stages decoupled; each owns its fixtures.
@@ -51,7 +52,7 @@ shape, read `docs/architecture.md`.
 
 ## Required commands
 
-- Build: `make build` (Go binary to `bin/seekbrr`)
+- Build: `make build` (Go binary to `bin/harbrr`)
 - Tests: `make test` — `go test -race -count=1 ./...`. **Always `-race -count=1`.**
 - Lint: `make lint` · auto-fix: `make lint-fix`
 - Format: `make fmt` (gofumpt + goimports)
@@ -102,10 +103,10 @@ shape, read `docs/architecture.md`.
   Management API requires auth; CSRF on cookie-auth surfaces. Redact secrets everywhere (see
   non-negotiables).
 - **Synthetic test-fixture secrets** (values that exist only to prove redaction) live exclusively in
-  `*_test.go` and `testdata/**`. These paths are excluded from secret scanning in three places that
-  **must stay in sync**: `scripts/check-no-secrets.sh`, `.gitguardian.yaml` (ggshield), and the
-  GitGuardian **dashboard** filepath exclusions (the GitHub App PR check — the repo `.gitguardian.yaml`
-  does *not* govern it). This never relaxes the "never commit real secrets" rule above.
+  `*_test.go`, `testdata/**`, and the vendored Jackett snapshot. These paths are excluded from secret
+  scanning in exactly two places that **must stay in sync**: `scripts/check-no-secrets.sh` and
+  `.gitleaks.toml`. Both run in pre-commit and in CI (`.github/workflows/security.yml`). This never
+  relaxes the "never commit real secrets" rule above.
 
 ## Commits / PRs
 

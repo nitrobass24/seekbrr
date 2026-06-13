@@ -1,4 +1,4 @@
-# seekbrr build plan
+# harbrr build plan
 
 The executable checklist. Work **top to bottom, one item at a time**, and check a box only when its
 tests are green (`make precommit` clean). Ordered by **risk retirement**, not product completeness —
@@ -42,7 +42,7 @@ decoupled.
 ## Phase 2 — Offline parity — *the gate*
 
 - [ ] Port Jackett's GPL-2.0 Cardigann engine tests (`CardigannIndexerHtmlTests`/`JsonTests`)
-- [ ] Build the differential harness (run Jackett + seekbrr on the same saved bytes; capture goldens)
+- [ ] Build the differential harness (run Jackett + harbrr on the same saved bytes; capture goldens)
 - [ ] Wire `internal/indexer/cardigann/parity` to the real engine (replace the stub `Process`)
 - [ ] Pass the **compatibility matrix** offline rows (each archetype has a fixture):
   - [ ] HTML / form login
@@ -63,7 +63,7 @@ decoupled.
 
 - [ ] `internal/torznab`: capabilities document + `t=caps|search|tvsearch|movie|music|book`
 - [ ] **caps/category correctness is a gate** (Sonarr/Radarr failures usually trace here)
-- [ ] Sonarr/Radarr can search a handful of real trackers through seekbrr end-to-end
+- [ ] Sonarr/Radarr can search a handful of real trackers through harbrr end-to-end
 
 ## Phase 4 — Live smoke (closes the MVP)
 
@@ -87,7 +87,7 @@ decoupled.
 ## Phase 7 — Product polish
 
 - [ ] *arr application sync (qui-as-app), Jackett/Prowlarr migration import
-- [ ] Native **seekbrr → autobrr push** (closes the RSS-polling gap; family-only win)
+- [ ] Native **harbrr → autobrr push** (closes the RSS-polling gap; family-only win)
 - [ ] cross-seed search backend; stats; notifications; web UI
 - [ ] Postgres behind the existing `dbinterface` (only now)
 

@@ -21,13 +21,13 @@ var flagToKey = map[string]string{
 }
 
 // Load assembles a Config from defaults, an optional YAML config file,
-// environment variables (SEEKBRR_-prefixed), and command-line flags, with
+// environment variables (HARBRR_-prefixed), and command-line flags, with
 // precedence flag > env > file > default. flags may be nil (e.g. in tests).
 func Load(cfgFile string, flags *pflag.FlagSet) (*Config, error) {
 	v := viper.New()
 	setDefaults(v)
 
-	v.SetEnvPrefix("SEEKBRR")
+	v.SetEnvPrefix("HARBRR")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
@@ -78,7 +78,7 @@ func readConfigFile(v *viper.Viper, cfgFile string) error {
 	if cfgFile != "" {
 		v.SetConfigFile(cfgFile)
 	} else {
-		v.SetConfigName("seekbrr")
+		v.SetConfigName("harbrr")
 		v.SetConfigType("yaml")
 		v.AddConfigPath(".")
 		v.AddConfigPath("./data")

@@ -1,6 +1,6 @@
 version: "2"
 
-# Base: autobrr/qui's config (family consistency), extended for seekbrr with
+# Base: autobrr/qui's config (family consistency), extended for harbrr with
 # gofumpt formatting, no-god-function complexity gates, and extra type-safety.
 
 issues:
@@ -15,7 +15,7 @@ formatters:
       extra-rules: true
     goimports:
       local-prefixes:
-        - github.com/autobrr/seekbrr
+        - github.com/autobrr/harbrr
 
 linters:
   enable:
@@ -40,12 +40,12 @@ linters:
     - testifylint
     - unconvert
     - whitespace
-    # --- seekbrr: no god functions (enforced, not just reviewed) ---
+    # --- harbrr: no god functions (enforced, not just reviewed) ---
     - funlen
     - gocyclo
     - gocognit
     - nestif
-    # --- seekbrr: extra type safety ---
+    # --- harbrr: extra type safety ---
     - forcetypeassert
     - nilnil
     - wrapcheck

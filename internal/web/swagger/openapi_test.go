@@ -7,7 +7,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/autobrr/seekbrr/internal/web/swagger"
+	"github.com/autobrr/harbrr/internal/web/swagger"
 )
 
 // loadSpec parses and validates the embedded spec as an OpenAPI 3 document. It

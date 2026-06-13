@@ -8,10 +8,10 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/autobrr/seekbrr/internal/config"
+	"github.com/autobrr/harbrr/internal/config"
 )
 
-// newTestFlags mirrors the persistent flags registered by cmd/seekbrr so the
+// newTestFlags mirrors the persistent flags registered by cmd/harbrr so the
 // loader's flag binding can be exercised offline.
 func newTestFlags() *pflag.FlagSet {
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
@@ -35,7 +35,7 @@ func TestDefaults(t *testing.T) {
 	if d.Log.Level != "info" || d.Log.Format != "console" {
 		t.Errorf("unexpected log defaults: %+v", d.Log)
 	}
-	if got, want := d.DatabasePath(), filepath.Join("./data", "seekbrr.db"); got != want {
+	if got, want := d.DatabasePath(), filepath.Join("./data", "harbrr.db"); got != want {
 		t.Errorf("DatabasePath() = %q, want %q", got, want)
 	}
 	if d.HasSecretKey() {
@@ -112,8 +112,8 @@ func TestLoadDefaults(t *testing.T) {
 }
 
 func TestLoadEnvOverride(t *testing.T) {
-	t.Setenv("SEEKBRR_SERVER_PORT", "9999")
-	t.Setenv("SEEKBRR_LOG_LEVEL", "debug")
+	t.Setenv("HARBRR_SERVER_PORT", "9999")
+	t.Setenv("HARBRR_LOG_LEVEL", "debug")
 
 	cfg, err := config.Load("", nil)
 	if err != nil {
@@ -129,8 +129,8 @@ func TestLoadEnvOverride(t *testing.T) {
 
 func TestLoadFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "seekbrr.yaml")
-	body := "server:\n  port: 8123\nlog:\n  level: warn\ndata_dir: /var/lib/seekbrr\n"
+	path := filepath.Join(dir, "harbrr.yaml")
+	body := "server:\n  port: 8123\nlog:\n  level: warn\ndata_dir: /var/lib/harbrr\n"
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -145,13 +145,13 @@ func TestLoadFile(t *testing.T) {
 	if cfg.Log.Level != "warn" {
 		t.Errorf("file log.level = %q, want warn", cfg.Log.Level)
 	}
-	if cfg.DataDir != "/var/lib/seekbrr" {
-		t.Errorf("file data_dir = %q, want /var/lib/seekbrr", cfg.DataDir)
+	if cfg.DataDir != "/var/lib/harbrr" {
+		t.Errorf("file data_dir = %q, want /var/lib/harbrr", cfg.DataDir)
 	}
 }
 
 func TestLoadFlagBeatsEnv(t *testing.T) {
-	t.Setenv("SEEKBRR_SERVER_PORT", "9999")
+	t.Setenv("HARBRR_SERVER_PORT", "9999")
 
 	fs := newTestFlags()
 	if err := fs.Set("port", "1234"); err != nil {

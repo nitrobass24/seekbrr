@@ -10,13 +10,13 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/autobrr/seekbrr/internal/indexer/definitions"
+	"github.com/autobrr/harbrr/internal/indexer/definitions"
 )
 
 // schemaResourceURL is the in-memory URL under which the embedded schema is
 // registered with the jsonschema compiler. It is never fetched over the
 // network; the compiler resolves it from the added resource.
-const schemaResourceURL = "mem://seekbrr/cardigann-schema.json"
+const schemaResourceURL = "mem://harbrr/cardigann-schema.json"
 
 // schemaPath is the path of the authoritative JSON-Schema inside the embedded
 // vendored definitions tree.
