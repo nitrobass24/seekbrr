@@ -63,7 +63,9 @@ func (r *replay) RoundTrip(req *stdhttp.Request) (*stdhttp.Response, error) {
 	}
 
 	if step.ExpectCookie != "" && !strings.Contains(req.Header.Get("Cookie"), step.ExpectCookie) {
-		return nil, r.fail("step %d: request Cookie header missing %q (session cookie did not propagate)", r.idx-1, step.ExpectCookie)
+		// The expected cookie value is never echoed — Cookie material stays out of
+		// logs/traces (AGENTS.md redaction rule), even for synthetic fixtures.
+		return nil, r.fail("step %d: request Cookie header did not contain the expected session cookie (it did not propagate)", r.idx-1)
 	}
 
 	resp, err := r.serve(req, step)

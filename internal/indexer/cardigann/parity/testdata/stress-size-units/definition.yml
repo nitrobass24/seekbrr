@@ -1,7 +1,7 @@
 ---
 id: sizeunits
 name: sizeunits
-description: "Size unit coverage: KB/MB/GB/TB, 1024-based, comma decimal."
+description: "Size unit coverage: KB/MB/GB/TB, 1024-based, period decimal (1.5 GB)."
 language: en-US
 type: public
 encoding: UTF-8

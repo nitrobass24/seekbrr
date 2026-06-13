@@ -7,7 +7,7 @@ byte-compares the canonical JSON it produces against the case's golden.
 
 ## Case layout
 
-```
+```text
 <case-name>/
   case.yml        # the spec (see fields below)
   definition.yml  # the tracker definition (or use vendor_def to load a vendored one)
@@ -141,7 +141,7 @@ Entries:
 
 ## Regenerating goldens
 
-```
+```bash
 go test ./internal/indexer/cardigann/parity/ -run TestParity -update
 ```
 

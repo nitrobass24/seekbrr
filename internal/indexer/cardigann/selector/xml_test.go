@@ -75,6 +75,39 @@ func TestParseXML(t *testing.T) {
 	}
 }
 
+// TestParseXMLNamespaceScoping proves a nested xmlns redeclaration does not leak
+// into a sibling: <child> rebinds the urn:ns namespace to prefix "b", but the
+// <a:sibling> that follows it (outside child) must keep the root's prefix "a".
+// With a flat, non-scoped prefix map the sibling would be mislabeled "b:sibling".
+func TestParseXMLNamespaceScoping(t *testing.T) {
+	t.Parallel()
+
+	const feed = `<root xmlns:a="urn:ns">
+  <child xmlns:b="urn:ns"><b:inner/></child>
+  <a:sibling/>
+</root>`
+
+	doc, err := New().ParseXML([]byte(feed))
+	if err != nil {
+		t.Fatalf("ParseXML: %v", err)
+	}
+
+	// The sibling keeps the root prefix "a".
+	if _, found, err := New().Field(doc.Root(), loader.SelectorBlock{Selector: `a\:sibling`}); err != nil || !found {
+		t.Fatalf("a:sibling not found (found=%v err=%v) — root prefix lost", found, err)
+	}
+	// It must NOT have leaked the inner prefix "b".
+	if _, leaked, err := New().Field(doc.Root(), loader.SelectorBlock{Selector: `b\:sibling`}); err != nil {
+		t.Fatalf("b:sibling query error: %v", err)
+	} else if leaked {
+		t.Error("sibling mislabeled b:sibling — nested namespace prefix leaked")
+	}
+	// The inner element inside child correctly uses prefix "b".
+	if _, found, err := New().Field(doc.Root(), loader.SelectorBlock{Selector: `b\:inner`}); err != nil || !found {
+		t.Errorf("b:inner not found (found=%v err=%v)", found, err)
+	}
+}
+
 // TestParseXMLInvalid proves malformed XML degrades cleanly (a loud error, no
 // panic).
 func TestParseXMLInvalid(t *testing.T) {
