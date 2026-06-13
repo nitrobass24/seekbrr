@@ -54,7 +54,7 @@ decoupled.
   - [ ] JSON-API
   - [ ] XML / Newznab
   - [ ] non-Latin-script (regexp2 path)
-  - [ ] freeleech (download/uploadvolumefactor)
+  - [x] freeleech (download/uploadvolumefactor)
   - [ ] multi-category
   - [ ] date-heavy (multiple .NET formats + relative)
   - [ ] magnet-only (magnet/infohash synthesis)
