@@ -1,0 +1,21 @@
+name: matrix-xml-newznab
+archetype: xml-newznab
+golden_source: hand-derived
+mode: parse
+description: >
+  Compatibility matrix: an XML/Newznab feed parsed through the cascadia (HTML)
+  backend, since Cardigann has no XML mode (Jackett feeds both HTML and XML to
+  AngleSharp). Rows are <item>; fields read a generic <name>, the <enclosure>
+  url attribute, and namespaced <torznab:attr name=.. value=..> elements (the
+  size/peer attributes). Sizes 1024-based (1 GB = 1073741824, 700 MB =
+  734003200); peers = seeders + leechers; category Movies (2000).
+
+  Known backend caveat (documented, not dodged): net/html is an HTML5 parser, not
+  AngleSharp. RSS elements that are void/special in HTML — notably <link> and
+  <title> — do not round-trip as text the way they do in AngleSharp, so this
+  fixture deliberately uses <name> and <enclosure url> instead of <title>/<link>.
+  The torznab:attr namespaced elements are parsed as literal "torznab:attr" tags.
+definition: definition.yml
+response: response.xml
+query:
+  keywords: ""

@@ -52,7 +52,7 @@ decoupled.
   - [x] HTML / form login
   - [x] HTML / cookie login
   - [x] JSON-API
-  - [ ] XML / Newznab
+  - [x] XML / Newznab
   - [x] non-Latin-script (regexp2 path)
   - [x] freeleech (download/uploadvolumefactor)
   - [x] multi-category
