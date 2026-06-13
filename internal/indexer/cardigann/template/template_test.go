@@ -368,12 +368,12 @@ func collectSearch(add func(string), s *loader.Search) {
 	add(s.Path)
 	for _, p := range s.Paths {
 		add(p.Path)
-		addInputs(add, p.Inputs)
+		addInputBlock(add, p.Inputs)
 		for _, c := range p.Categories {
 			add(c.String())
 		}
 	}
-	addInputs(add, s.Inputs)
+	addInputBlock(add, s.Inputs)
 	add(s.Rows.Selector)
 	addSelectorBlockText(add, s.Rows.Text)
 	for _, f := range s.Rows.Filters {
@@ -438,6 +438,12 @@ func addSelectorBlockText(add func(string), text *loader.Scalar) {
 func addInputs(add func(string), inputs map[string]loader.Scalar) {
 	for _, v := range inputs {
 		add(v.String())
+	}
+}
+
+func addInputBlock(add func(string), inputs loader.InputsBlock) {
+	for _, in := range inputs.Ordered() {
+		add(in.Value.String())
 	}
 }
 

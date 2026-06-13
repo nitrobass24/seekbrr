@@ -94,8 +94,35 @@ func parseField(fe loader.FieldEntry, row selector.Row, query Query, deps Deps, 
 		return nil
 	}
 
+	resolved, err = applyImplicitDate(name, resolved, deps)
+	if err != nil {
+		return fmt.Errorf("field %q: %w", name, err)
+	}
+
 	storeField(state, name, modifiers, resolved)
 	return nil
+}
+
+// applyImplicitDate reproduces Jackett ParseFields' case "date": the resolved
+// date value (post-filters, post-default) is ALWAYS run through DateTimeUtil.
+// FromUnknown before it becomes PublishDate and .Result.date. harbrr's
+// ParseRelTime is the FromUnknown subset (ISO/unix/relative/named-day) and emits
+// canonical RFC3339; Jackett emits RFC1123Z, so goldens hold the same instant in
+// harbrr's canonical form (see parity/testdata/README.md). An unparseable date
+// is a loud field error, which ParseResults turns into a row skip (HTML) or
+// abort (JSON), exactly as Jackett's thrown exception does.
+func applyImplicitDate(name, value string, deps Deps) (string, error) {
+	if name != "date" || strings.TrimSpace(value) == "" {
+		return value, nil
+	}
+	if deps.Filters == nil || deps.Filters.ParseRelTime == nil {
+		return value, nil
+	}
+	parsed, err := deps.Filters.ParseRelTime(value)
+	if err != nil {
+		return "", fmt.Errorf("parsing date field: %w", err)
+	}
+	return parsed, nil
 }
 
 // resolveValue applies the required/optional + default branch after extraction

@@ -222,6 +222,13 @@ func TestParseRelTime(t *testing.T) {
 		{"unix-13digit-as-seconds", "1577880000000", "51971-01-11T00:00:00Z"},
 		{"iso-8601", "2023-01-02T15:04:05Z", "2023-01-02T15:04:05Z"},
 		{"iso-space", "2023-01-02 15:04:05", "2023-01-02T15:04:05Z"},
+		{"iso-space-no-secs", "2023-01-02 15:04", "2023-01-02T15:04:00Z"},
+		// Human absolute formats Jackett reaches via DateTime.Parse(InvariantCulture).
+		{"month-abbr-comma", "Jan 15, 2023", "2023-01-15T00:00:00Z"},
+		{"month-full-comma", "January 15, 2023", "2023-01-15T00:00:00Z"},
+		{"day-month-abbr", "15 Aug 2023", "2023-08-15T00:00:00Z"},
+		{"slash-ymd", "2023/08/15", "2023-08-15T00:00:00Z"},
+		{"slash-mdy-invariant", "08/15/2023", "2023-08-15T00:00:00Z"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -6,7 +6,6 @@ import (
 	"io"
 	stdhttp "net/http"
 	"net/url"
-	"sort"
 	"strings"
 
 	apphttp "github.com/autobrr/harbrr/internal/http"
@@ -57,9 +56,13 @@ func searchPaths(def *loader.Definition) []loader.SearchPathBlock {
 
 // buildOneRequest renders one search path into a builtRequest.
 func buildOneRequest(def *loader.Definition, path loader.SearchPathBlock, query Query, deps Deps) (builtRequest, error) {
-	ctx := requestContext(query, deps)
-
-	rendered, err := template.Eval(path.Path, ctx)
+	// The path is rendered with URL-encoded variable values: Jackett renders
+	// SearchPath.Path with WebUtility.UrlEncode (then +->%20), so a keyword or
+	// passkey inlined into the path (e.g. `?filename={{ .Keywords }}`, as teamos
+	// and other defs do) becomes a valid, parity-matching URL rather than carrying
+	// a literal space. Inputs and headers use the un-encoded context (inputs are
+	// encoded later by encodeOrdered; headers are not URL values).
+	rendered, err := template.Eval(path.Path, requestPathContext(query, deps))
 	if err != nil {
 		return builtRequest{}, fmt.Errorf("rendering search path: %w", err)
 	}
@@ -73,7 +76,7 @@ func buildOneRequest(def *loader.Definition, path loader.SearchPathBlock, query 
 		return builtRequest{}, err
 	}
 
-	headers, err := renderHeaders(def.Search.Headers, ctx)
+	headers, err := renderHeaders(def.Search.Headers, requestContext(query, deps))
 	if err != nil {
 		return builtRequest{}, err
 	}
@@ -87,6 +90,46 @@ func buildOneRequest(def *loader.Definition, path loader.SearchPathBlock, query 
 func requestContext(query Query, deps Deps) *template.Context {
 	config := withSitelink(deps.Config, deps.BaseURL)
 	return newContext(config, query.queryMap(), nil, query.keywords(), query.Categories, deps.Clock)
+}
+
+// requestPathContext is requestContext with every scalar variable value
+// URL-encoded for path-template substitution (space -> %20), reproducing
+// Jackett's `applyGoTemplateText(SearchPath.Path, ..., WebUtility.UrlEncode)`.
+// No vendored def substitutes .Config.sitelink (a URL) into a path, so encoding
+// all values is safe. Residual divergence: url.QueryEscape escapes a few
+// sub-delims (*()'!) that .NET leaves literal — documented in
+// parity/testdata/README.md.
+func requestPathContext(query Query, deps Deps) *template.Context {
+	config := encodeStringValues(withSitelink(deps.Config, deps.BaseURL))
+	return newContext(config, encodeStringValues(query.queryMap()), nil,
+		pathEscape(query.keywords()), encodeStringSlice(query.Categories), deps.Clock)
+}
+
+// pathEscape URL-encodes a value for inlining into a path/query, with spaces as
+// %20 (Jackett's WebUtility.UrlEncode followed by +->%20), not '+'.
+func pathEscape(s string) string {
+	return strings.ReplaceAll(url.QueryEscape(s), "+", "%20")
+}
+
+// encodeStringValues returns a copy of m with each value path-escaped.
+func encodeStringValues(m map[string]string) map[string]string {
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = pathEscape(v)
+	}
+	return out
+}
+
+// encodeStringSlice returns a copy of s with each element path-escaped.
+func encodeStringSlice(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	out := make([]string, len(s))
+	for i, v := range s {
+		out[i] = pathEscape(v)
+	}
+	return out
 }
 
 // withSitelink returns a copy of config with .Config.sitelink defaulted to the
@@ -131,32 +174,32 @@ func inheritInputs(path loader.SearchPathBlock) bool {
 	return path.InheritInputs == nil || *path.InheritInputs
 }
 
-// kv is one ordered input pair. Inputs are emitted in sorted key order so the
-// rendered GET query / POST body is deterministic (test-assertable).
+// kv is one ordered input pair. Inputs are emitted in DEFINITION order so the
+// rendered GET query / POST body reproduces Jackett's key order.
 type kv struct {
 	key   string
 	value string
 }
 
-// renderInputs template-renders each input value in sorted key order. The $raw
-// input is special: its rendered value is a literal query fragment ("a=1&b=2")
-// that is split into pairs rather than url-encoded as one value (Jackett's $raw
-// handling).
-func renderInputs(inputs map[string]loader.Scalar, ctx *template.Context, allowEmpty bool) ([]kv, error) {
+// renderInputs template-renders each input value in DEFINITION order (Jackett
+// appends inputs to an ordered collection as it iterates them). The $raw input
+// is special: its rendered value is a literal query fragment ("a=1&b=2") that is
+// split into pairs rather than url-encoded as one value (Jackett's $raw handling).
+func renderInputs(inputs loader.InputsBlock, ctx *template.Context, allowEmpty bool) ([]kv, error) {
 	var out []kv
-	for _, name := range sortedScalarKeys(inputs) {
-		rendered, err := template.Eval(inputs[name].String(), ctx)
+	for _, in := range inputs.Ordered() {
+		rendered, err := template.Eval(in.Value.String(), ctx)
 		if err != nil {
-			return nil, fmt.Errorf("rendering search input %q: %w", name, err)
+			return nil, fmt.Errorf("rendering search input %q: %w", in.Key, err)
 		}
-		if name == "$raw" {
+		if in.Key == "$raw" {
 			out = append(out, splitRaw(rendered)...)
 			continue
 		}
 		if strings.TrimSpace(rendered) == "" && !allowEmpty {
 			continue
 		}
-		out = append(out, kv{key: name, value: rendered})
+		out = append(out, kv{key: in.Key, value: rendered})
 	}
 	return out, nil
 }
@@ -183,7 +226,7 @@ func assembleRequest(path loader.SearchPathBlock, absURL string, pairs []kv, hea
 		return builtRequest{
 			method:  stdhttp.MethodPost,
 			url:     absURL,
-			body:    encodePairs(pairs).Encode(),
+			body:    encodeOrdered(pairs),
 			headers: withFormContentType(headers),
 		}, nil
 	}
@@ -195,29 +238,41 @@ func assembleRequest(path loader.SearchPathBlock, absURL string, pairs []kv, hea
 	return builtRequest{method: stdhttp.MethodGet, url: full, headers: headers}, nil
 }
 
-// encodePairs converts ordered pairs to url.Values (order is recoverable via the
-// caller's sorted keys; url.Values.Encode itself sorts keys, giving a stable
-// body).
-func encodePairs(pairs []kv) url.Values {
-	v := url.Values{}
+// encodeOrdered renders pairs as an ordered x-www-form-urlencoded string
+// (k=v&k=v) in the GIVEN order, matching Jackett's ordered queryCollection.
+// url.Values.Encode would sort keys and corrupt request parity, so we encode by
+// hand (still percent-encoding keys and values, space -> '+').
+func encodeOrdered(pairs []kv) string {
+	var b strings.Builder
 	for _, p := range pairs {
-		v.Add(p.key, p.value)
+		if b.Len() > 0 {
+			b.WriteByte('&')
+		}
+		b.WriteString(url.QueryEscape(p.key))
+		b.WriteByte('=')
+		b.WriteString(url.QueryEscape(p.value))
 	}
-	return v
+	return b.String()
 }
 
-// appendQuery appends pairs to rawURL's query, preserving any fixed params the
-// resolved path already carries.
+// appendQuery appends pairs (in order) to rawURL, preserving the resolved path's
+// embedded query string VERBATIM. Jackett keeps the rendered path's query as-is
+// and appends inputs to it in definition order (CardigannIndexer.PerformQuery);
+// re-encoding via url.Values would re-sort both and break request parity.
 func appendQuery(rawURL string, pairs []kv) (string, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return "", fmt.Errorf("parsing search URL %q: %w", apphttp.RedactURL(rawURL), err)
 	}
-	q := u.Query()
-	for _, p := range pairs {
-		q.Add(p.key, p.value)
+	appended := encodeOrdered(pairs)
+	switch {
+	case appended == "":
+		// No inputs to add: leave the path's query untouched (verbatim).
+	case u.RawQuery == "":
+		u.RawQuery = appended
+	default:
+		u.RawQuery = u.RawQuery + "&" + appended
 	}
-	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
 
@@ -325,16 +380,6 @@ func resolveURL(baseURL, rendered string) (string, error) {
 		return "", fmt.Errorf("parsing base URL %q: %w", apphttp.RedactURL(baseURL), err)
 	}
 	return base.ResolveReference(ref).String(), nil
-}
-
-// sortedScalarKeys returns scalar-map keys in deterministic order.
-func sortedScalarKeys(m map[string]loader.Scalar) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // boolVal dereferences an optional bool, defaulting to false.

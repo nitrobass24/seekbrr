@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/autobrr/harbrr/internal/indexer/cardigann/loader"
 )
@@ -14,9 +16,21 @@ import (
 type jsonNode struct {
 	// value is the JSON value this node points at (map, slice, scalar, or nil).
 	value any
+	// root is the full row element for a row node reshaped by rows.attribute: a
+	// field selector beginning ".." resolves against it (Jackett's parentObj =
+	// Row escape) instead of value. nil means root == value (the common case).
+	root any
 	// cached canonical string of value, computed lazily by text().
 	str    string
 	strSet bool
+}
+
+// rowRoot returns the full row element for a ".." escape, defaulting to value.
+func (n *jsonNode) rowRoot() any {
+	if n.root != nil {
+		return n.root
+	}
+	return n.value
 }
 
 // ParseJSON parses a JSON response body into a Document.
@@ -31,7 +45,23 @@ func (e *Engine) ParseJSON(body []byte) (*Document, error) {
 }
 
 func (n *jsonNode) query(sel string) (node, bool, error) {
-	v, ok := resolvePath(n.value, trimDotPrefix(sel))
+	// A field selector beginning ".." escapes to the full row element (Jackett:
+	// parentObj = Row), so a field can read outside the rows.attribute sub-object.
+	// The leading dots are then stripped like any other JSON selector.
+	base := n.value
+	if strings.HasPrefix(sel, "..") {
+		base = n.rowRoot()
+	}
+
+	// Jackett handleJsonSelector first resolves the pseudo-selector conditions
+	// (:has/:not/:contains) via JsonParseFieldSelector to get the field PATH, then
+	// SelectToken(path) reads the value. A plain dotted path has no filters, so
+	// jsonFieldSelector reduces to a path-existence check (the previous behavior).
+	path, ok := jsonFieldSelector(base, trimDotPrefix(sel))
+	if !ok {
+		return nil, false, nil
+	}
+	v, ok := resolvePath(base, path)
 	if !ok {
 		return nil, false, nil
 	}
@@ -75,6 +105,12 @@ func (n *jsonNode) text() string {
 // selector into "0 rows" instead of an error (field-level Multiple handling lives
 // in the engine, item 10).
 func (d *Document) jsonRows(block loader.RowsBlock) ([]Row, error) {
+	// Jackett evaluates rows.count first: a count selector that parses to < 1
+	// short-circuits the path to zero rows (a parse failure is ignored).
+	if d.jsonCountIsZero(block.Count) {
+		return nil, nil
+	}
+
 	arr, ok, err := resolveRowsArray(d.json.value, block.Selector)
 	if err != nil {
 		return nil, err
@@ -88,11 +124,44 @@ func (d *Document) jsonRows(block loader.RowsBlock) ([]Row, error) {
 		return nil, fmt.Errorf("rows selector %q: %w", block.Selector, ErrSelectorNoMatch)
 	}
 
-	rows := make([]Row, 0, len(arr))
-	for i := range arr {
-		rows = append(rows, Row{kind: kindJSON, json: &jsonNode{value: arr[i]}})
+	return d.buildJSONRows(arr, block.Attribute), nil
+}
+
+// jsonCountIsZero reports whether rows.count resolves to an integer < 1. Jackett
+// uses int.TryParse + "count < 1", so a missing/non-integer count never
+// short-circuits (the parse simply fails and is ignored).
+func (d *Document) jsonCountIsZero(count *loader.SelectorBlock) bool {
+	if count == nil || count.Selector == "" {
+		return false
 	}
-	return rows, nil
+	node, ok, err := d.json.query(count.Selector)
+	if err != nil || !ok {
+		return false
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(node.text()))
+	return err == nil && n < 1
+}
+
+// buildJSONRows turns the resolved array into rows. When rows.attribute is set,
+// each row is reshaped to that sub-object for field extraction (Jackett: selObj =
+// Row.SelectToken(Attribute)); the full element is kept as the node root so a
+// ".." field can still escape to it. A row whose attribute sub-object is absent
+// is skipped — Jackett skips it under MissingAttributeEqualsNoResults and would
+// otherwise dereference null; harbrr degrades cleanly in both cases.
+func (d *Document) buildJSONRows(arr []any, attribute string) []Row {
+	rows := make([]Row, 0, len(arr))
+	for _, e := range arr {
+		value := e
+		if attribute != "" {
+			sub, ok := resolvePath(e, attribute)
+			if !ok {
+				continue
+			}
+			value = sub
+		}
+		rows = append(rows, Row{kind: kindJSON, json: &jsonNode{value: value, root: e}})
+	}
+	return rows
 }
 
 // boolVal dereferences an optional bool flag, defaulting to false.

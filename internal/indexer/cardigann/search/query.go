@@ -146,15 +146,25 @@ func newContext(config, query, result map[string]string, keywords string, catego
 }
 
 // today renders the .Today namespace from the reference clock. Jackett seeds
-// .Today.Year/Month/Day from DateTime.Now (GetBaseTemplateVariables); the engine
-// injects a deterministic clock so date-defaulting templates are reproducible.
+// .Today.Year/Month/Day from DateTime.Today (GetBaseTemplateVariables); the
+// engine injects a deterministic clock so date-defaulting templates are
+// reproducible.
+//
+// Jackett applies a deliberate quirk to .Today.Year: in January (month == 1) it
+// reports the PREVIOUS year — `Month > 1 ? Year : Year - 1` — so a def that
+// defaults a missing date to "{{ .Today.Year }}-01-01" does not stamp a
+// just-rolled-over release in the future. We reproduce it exactly for parity.
 func today(clock func() time.Time) template.Today {
 	if clock == nil {
 		clock = time.Now
 	}
 	now := clock()
+	year := now.Year()
+	if now.Month() == time.January {
+		year--
+	}
 	return template.Today{
-		Year:  strconv.Itoa(now.Year()),
+		Year:  strconv.Itoa(year),
 		Month: strconv.Itoa(int(now.Month())),
 		Day:   strconv.Itoa(now.Day()),
 	}

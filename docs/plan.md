@@ -41,21 +41,25 @@ decoupled.
 
 ## Phase 2 — Offline parity — *the gate*
 
-- [ ] Port Jackett's GPL-2.0 Cardigann engine tests (`CardigannIndexerHtmlTests`/`JsonTests`)
-- [ ] Build the differential harness (run Jackett + harbrr on the same saved bytes; capture goldens)
-- [ ] Wire `internal/indexer/cardigann/parity` to the real engine (replace the stub `Process`)
-- [ ] Pass the **compatibility matrix** offline rows (each archetype has a fixture):
-  - [ ] HTML / form login
-  - [ ] HTML / cookie login
-  - [ ] JSON-API
-  - [ ] XML / Newznab
-  - [ ] non-Latin-script (regexp2 path)
-  - [ ] freeleech (download/uploadvolumefactor)
-  - [ ] multi-category
-  - [ ] date-heavy (multiple .NET formats + relative)
-  - [ ] magnet-only (magnet/infohash synthesis)
-  - [ ] download-link pre-request
-- [ ] **Success criteria met:** 100% defs load w/o panic · zero silent schema failures (triaged to a
+- [x] Port Jackett's GPL-2.0 Cardigann engine tests (`CardigannIndexerHtmlTests`/`JsonTests`) — fixtures
+      byte-for-byte under `parity/testdata/jackett/` (+ NOTICE); `jackett_oracle_test.go` asserts
+      Jackett's exact request URLs and first-release values (25 / 78 releases)
+- [x] Build the differential harness (offline oracle: goldens ported from Jackett's own test
+      assertions or hand-derived from documented Jackett semantics, never captured from a live
+      Jackett — see `parity/testdata/README.md`; each case records `golden_source` provenance)
+- [x] Wire `internal/indexer/cardigann/parity` to the real engine (replace the stub `Process`)
+- [x] Pass the **compatibility matrix** offline rows (each archetype has a fixture):
+  - [x] HTML / form login
+  - [x] HTML / cookie login
+  - [x] JSON-API
+  - [x] XML / Newznab
+  - [x] non-Latin-script (regexp2 path)
+  - [x] freeleech (download/uploadvolumefactor)
+  - [x] multi-category
+  - [x] date-heavy (multiple .NET formats + relative)
+  - [x] magnet-only (magnet/infohash synthesis)
+  - [x] download-link pre-request
+- [x] **Success criteria met:** 100% defs load w/o panic · zero silent schema failures (triaged to a
       visible skip-list) · ported Jackett tests pass · matches Jackett on ≥25 saved fixtures · secrets
       redacted in logs · broken indexers degrade cleanly
 
@@ -68,6 +72,12 @@ decoupled.
 ## Phase 4 — Live smoke (closes the MVP)
 
 - [ ] 5 real trackers, live login/session, gentle rate
+- [ ] **Lazy login**: log in only when a search response looks logged-out (Jackett's behavior), then
+      retry once — replacing the eager once-per-Engine login established in Phase 2 (which logs in on
+      the first search regardless; see `parity/testdata/README.md` "Eager login")
+- [ ] **.NET-compatible URL encoder**: replace `url.QueryEscape` in the query/path value encoders so
+      `*()'!` match `WebUtility.UrlEncode` (Phase 2 leaves these escaped; see `parity/testdata/README.md`
+      "Known divergences")
 - [ ] Fetch/auth matrix rows as available: Cloudflare/FlareSolverr (pluggable solver) · 2FA/manual-cookie
 - [ ] Docker image + config file
 
@@ -82,6 +92,11 @@ decoupled.
 ## Phase 6 — Scale coverage
 
 - [ ] Broaden response-mode and definition coverage; expand selector/date edge-case fixtures
+- [ ] **Complete the download resolver**: `.DownloadUri` template namespace, `before.inputs`/
+      `before.pathselector`, download-selector template eval, `download.infohash`/`method: post`/
+      `headers`, `testlinktorrent` (Phase 2 ships selectors + `before.path`; see `parity/testdata/README.md`)
+- [ ] **XML backend edge parity**: CDATA / mixed-namespace / AngleSharp-vs-cascadia edge cases beyond the
+      common RSS/Newznab shapes Phase 2 covers
 - [ ] Native **Avistaz** family (post-parity; the one family the corpus doesn't cover)
 
 ## Phase 7 — Product polish

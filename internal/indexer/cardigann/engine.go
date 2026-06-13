@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	stdhttp "net/http"
+	"sync"
 	"time"
 
 	"github.com/autobrr/harbrr/internal/indexer/cardigann/dateparse"
@@ -45,6 +46,10 @@ type Engine struct {
 	login   *login.Executor
 	doer    search.Doer
 	baseURL string
+
+	// loginMu guards the once-per-Engine login memoization (ensureSession).
+	loginMu  sync.Mutex
+	loggedIn bool
 }
 
 // options collects the configurable construction inputs before NewEngine wires
@@ -121,9 +126,10 @@ func resolveOptions(def *loader.Definition, opts []Option) options {
 	if o.clock == nil {
 		o.clock = time.Now
 	}
-	if o.config == nil {
-		o.config = map[string]string{}
-	}
+	// Seed .Config from the definition's settings defaults, then overlay the
+	// caller's explicit config so user-supplied values win — matching Jackett,
+	// where a request template reads the setting Default until the user sets it.
+	o.config = mergeConfig(DefaultConfig(def), o.config)
 	if o.baseURL == "" {
 		o.baseURL = firstLink(def)
 	}
@@ -193,7 +199,7 @@ func (e *Engine) Search(query Query) ([]*Release, error) {
 	if e.doer == nil {
 		return nil, fmt.Errorf("cardigann: Search for %q requires WithDoer (use ParseResponse for offline extraction)", e.def.ID)
 	}
-	if err := e.login.EnsureLoggedIn(e.def); err != nil {
+	if err := e.ensureSession(); err != nil {
 		return nil, fmt.Errorf("cardigann: login for %q: %w", e.def.ID, err)
 	}
 	releases, err := search.Execute(e.def, query, e.login.Session(), e.doer, e.deps)
@@ -201,6 +207,48 @@ func (e *Engine) Search(query Query) ([]*Release, error) {
 		return nil, fmt.Errorf("cardigann: search for %q: %w", e.def.ID, err)
 	}
 	return releases, nil
+}
+
+// ensureSession logs in at most once per Engine. Jackett logs in at configure
+// time and reuses the session across searches; harbrr defers login to the first
+// search and memoizes it, so a reused Engine does not re-run the login sequence
+// on every query (which, for the many private defs without a login.test block,
+// would mean a full login POST per search — a live login-rate hazard). Detecting
+// an expired session in a search response and re-logging-in is the Phase 4
+// lazy-login item; until then the session is established once.
+func (e *Engine) ensureSession() error {
+	e.loginMu.Lock()
+	defer e.loginMu.Unlock()
+	if e.loggedIn {
+		return nil
+	}
+	if err := e.login.EnsureLoggedIn(e.def); err != nil {
+		return err //nolint:wrapcheck // Search wraps with the def id + "login for".
+	}
+	e.loggedIn = true
+	return nil
+}
+
+// ResolveDownload turns a release's download link into the real torrent URL when
+// the definition declares a download block (selectors + optional before
+// pre-request). A def with no download block returns the link unchanged. It
+// ensures the session first (the download page is usually behind login) and
+// drives the same Doer as Search.
+func (e *Engine) ResolveDownload(link string) (string, error) {
+	if e.def.Download == nil {
+		return link, nil
+	}
+	if e.doer == nil {
+		return "", fmt.Errorf("cardigann: ResolveDownload for %q requires WithDoer", e.def.ID)
+	}
+	if err := e.ensureSession(); err != nil {
+		return "", fmt.Errorf("cardigann: login for %q: %w", e.def.ID, err)
+	}
+	resolved, err := search.ResolveDownload(e.def, link, e.login.Session(), e.doer, e.deps)
+	if err != nil {
+		return "", fmt.Errorf("cardigann: resolving download for %q: %w", e.def.ID, err)
+	}
+	return resolved, nil
 }
 
 // ParseResponse is the offline extraction half: parse a saved response body into

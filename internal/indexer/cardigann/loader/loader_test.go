@@ -150,6 +150,33 @@ func TestParseInvalid(t *testing.T) {
 	}
 }
 
+// TestInputsBlockPreservesOrder proves search inputs decode in definition
+// (YAML) order, not alphabetical. Jackett iterates Search.Inputs in source order
+// when building the request query; a plain Go map would randomize it.
+func TestInputsBlockPreservesOrder(t *testing.T) {
+	t.Parallel()
+
+	d, err := Parse(readFixture(t, "inputs_order.yml"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	ordered := d.Search.Inputs.Ordered()
+	got := make([]string, 0, len(ordered))
+	for _, in := range ordered {
+		got = append(got, in.Key)
+	}
+	want := []string{"zeta", "alpha", "mu"}
+	if len(got) != len(want) {
+		t.Fatalf("input keys = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("input keys = %v, want %v (definition order)", got, want)
+		}
+	}
+}
+
 func TestParseScalarRejectsNonScalar(t *testing.T) {
 	t.Parallel()
 	// A mapping where the schema permits a scalar union must be rejected by

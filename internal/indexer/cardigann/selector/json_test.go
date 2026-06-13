@@ -89,6 +89,203 @@ func TestRowsJSON(t *testing.T) {
 	})
 }
 
+// TestParseJSONSelector pins the pseudo-selector parser against Jackett's
+// _JsonSelectorRegex, in particular that a nested filter key extends to the ')'
+// followed by ':' or end (not the inner ')'), so "name:contains(1080)" is one
+// key, not split.
+func TestParseJSONSelector(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		selector string
+		wantPath string
+		wantOps  []jsonFilter
+	}{
+		{
+			name:     "bare path no filters",
+			selector: "data",
+			wantPath: "data",
+		},
+		{
+			name:     "single has",
+			selector: "data:has(attributes.size)",
+			wantPath: "data",
+			wantOps:  []jsonFilter{{op: "has", key: "attributes.size"}},
+		},
+		{
+			name:     "nested key kept whole",
+			selector: "data:has(attributes.name:contains(1080)):not(attributes.fake)",
+			wantPath: "data",
+			wantOps: []jsonFilter{
+				{op: "has", key: "attributes.name:contains(1080)"},
+				{op: "not", key: "attributes.fake"},
+			},
+		},
+		{
+			name:     "leading filter empty path",
+			selector: ":contains(1080)",
+			wantPath: "",
+			wantOps:  []jsonFilter{{op: "contains", key: "1080"}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			path, ops := parseJSONSelector(tc.selector)
+			if path != tc.wantPath {
+				t.Errorf("path = %q, want %q", path, tc.wantPath)
+			}
+			if len(ops) != len(tc.wantOps) {
+				t.Fatalf("ops = %+v, want %+v", ops, tc.wantOps)
+			}
+			for i := range ops {
+				if ops[i] != tc.wantOps[i] {
+					t.Errorf("ops[%d] = %+v, want %+v", i, ops[i], tc.wantOps[i])
+				}
+			}
+		})
+	}
+}
+
+// TestRowsJSONPseudoFilters proves :has/:not/:contains filter the rows array
+// element-by-element exactly as Jackett's JsonParseRowsSelector +
+// JsonParseFieldSelector do, including a nested :contains and an absent-key
+// :not. Of 5 UNIT3D-shaped rows only id 1 passes every condition; this is the
+// mechanism the JSON oracle relies on to reduce 100 rows to 78.
+func TestRowsJSONPseudoFilters(t *testing.T) {
+	t.Parallel()
+
+	doc := mustParseJSON(t, "pseudo_rows.json")
+	const sel = "data:has(attributes.size):has(attributes.name:contains(1080))" +
+		":not(attributes.fake_att):not(attributes.uploader:contains(BadGuy))"
+
+	rows, err := doc.Rows(loader.RowsBlock{Selector: sel})
+	if err != nil {
+		t.Fatalf("Rows: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1 (only id 1 satisfies every condition)", len(rows))
+	}
+	// id 1 is the surviving row: name contains 1080, has size+poster, uploader
+	// is not BadGuy, no fake_att.
+	got, found, err := New().Field(rows[0], loader.SelectorBlock{Selector: "id"})
+	if err != nil || !found {
+		t.Fatalf("Field id: found=%v err=%v", found, err)
+	}
+	if got != "1" {
+		t.Errorf("surviving row id = %q, want 1", got)
+	}
+}
+
+// TestFieldJSONContainsCondition proves a field selector with a :contains
+// condition extracts the value only when the condition holds, matching
+// handleJsonSelector (the def's title_dts uses name:contains(DTS)).
+func TestFieldJSONContainsCondition(t *testing.T) {
+	t.Parallel()
+
+	doc := mustParseJSON(t, "pseudo_rows.json")
+	rows, err := doc.Rows(loader.RowsBlock{Selector: "data"})
+	if err != nil {
+		t.Fatalf("Rows: %v", err)
+	}
+
+	// Row 0 (id 1) name "Movie One 1080p" contains 1080 -> the conditioned
+	// selector yields the name.
+	v, found, err := New().Field(rows[0], loader.SelectorBlock{Selector: "attributes.name:contains(1080)"})
+	if err != nil || !found {
+		t.Fatalf("row0 conditioned field: found=%v err=%v", found, err)
+	}
+	if v != "Movie One 1080p" {
+		t.Errorf("row0 value = %q, want Movie One 1080p", v)
+	}
+
+	// Row 1 (id 2) name "Movie Two 720p" does not contain 1080 -> not found.
+	_, found, err = New().Field(rows[1], loader.SelectorBlock{Selector: "attributes.name:contains(1080)"})
+	if err != nil {
+		t.Fatalf("row1 conditioned field error: %v", err)
+	}
+	if found {
+		t.Error("row1 conditioned field found, want not found (name lacks 1080)")
+	}
+}
+
+// TestRowsJSONAttribute proves rows.attribute reshapes each row to its
+// sub-object for field extraction, that a ".." field escapes to the full row
+// element, and that a row missing the attribute sub-object is skipped. This is
+// the UNIT3D shape the JSON oracle uses (rows.attribute: attributes).
+func TestRowsJSONAttribute(t *testing.T) {
+	t.Parallel()
+
+	doc := mustParseJSON(t, "attr_rows.json")
+	rows, err := doc.Rows(loader.RowsBlock{Selector: "data", Attribute: "attributes"})
+	if err != nil {
+		t.Fatalf("Rows: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want 2 (the attribute-less row is skipped)", len(rows))
+	}
+
+	// Fields resolve against the attributes sub-object.
+	name, found, err := New().Field(rows[0], loader.SelectorBlock{Selector: "name"})
+	if err != nil || !found {
+		t.Fatalf("name: found=%v err=%v", found, err)
+	}
+	if name != "Row A" {
+		t.Errorf("name = %q, want Row A", name)
+	}
+
+	// A ".." selector escapes to the full row element, reading a key OUTSIDE
+	// attributes (the top-level id).
+	id, found, err := New().Field(rows[0], loader.SelectorBlock{Selector: "..id"})
+	if err != nil || !found {
+		t.Fatalf("..id: found=%v err=%v", found, err)
+	}
+	if id != "11" {
+		t.Errorf("..id = %q, want 11 (escaped to full row)", id)
+	}
+}
+
+// TestRowsJSONCount proves a rows.count selector that resolves to an integer < 1
+// short-circuits to zero rows (Jackett's count < 1 -> continue), while a count
+// >= 1 leaves the rows intact.
+func TestRowsJSONCount(t *testing.T) {
+	t.Parallel()
+
+	t.Run("zero count yields no rows", func(t *testing.T) {
+		t.Parallel()
+		doc := mustParseJSON(t, "zero_count.json")
+		rows, err := doc.Rows(loader.RowsBlock{
+			Selector:  "data",
+			Attribute: "attributes",
+			Count:     &loader.SelectorBlock{Selector: "meta.total"},
+		})
+		if err != nil {
+			t.Fatalf("Rows: %v", err)
+		}
+		if len(rows) != 0 {
+			t.Fatalf("rows = %d, want 0 (count is 0)", len(rows))
+		}
+	})
+
+	t.Run("positive count keeps rows", func(t *testing.T) {
+		t.Parallel()
+		doc := mustParseJSON(t, "attr_rows.json")
+		rows, err := doc.Rows(loader.RowsBlock{
+			Selector:  "data",
+			Attribute: "attributes",
+			Count:     &loader.SelectorBlock{Selector: "meta.total"},
+		})
+		if err != nil {
+			t.Fatalf("Rows: %v", err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("rows = %d, want 2 (count is 2)", len(rows))
+		}
+	})
+}
+
 // TestFieldJSON is the STANDING JSON extraction suite: dotted paths, array
 // indices, leaf coercion, and the case switch with "*", asserted against
 // JToken.ToString() / String.Join semantics.

@@ -188,6 +188,10 @@ func TestParseResponse_ResultOrder(t *testing.T) {
 // default "{{ .Today.Year }}-01-01", which must render the fixed-clock year
 // (2023) rather than empty. This locks the clock->template seam, which is
 // otherwise invisible (the clock only reaching dateparse would leave .Today empty).
+//
+// The default renders "{{ .Today.Year }}-01-01". The fixed clock is in January,
+// so Jackett's .Today.Year quirk reports the PREVIOUS year (2022), and the
+// implicit date parse (case "date" -> FromUnknown) canonicalises it to RFC3339.
 func TestParseResponse_TodayDefault(t *testing.T) {
 	t.Parallel()
 	eng := newFixtureEngine(t, "today_default.yml")
@@ -199,8 +203,29 @@ func TestParseResponse_TodayDefault(t *testing.T) {
 	if len(releases) != 1 {
 		t.Fatalf("releases = %d, want 1", len(releases))
 	}
-	if releases[0].PublishDate != "2023-01-01" {
-		t.Errorf("publishDate = %q, want 2023-01-01 (fixed-clock .Today.Year)", releases[0].PublishDate)
+	if releases[0].PublishDate != "2022-01-01T00:00:00Z" {
+		t.Errorf("publishDate = %q, want 2022-01-01T00:00:00Z (January .Today.Year quirk -> 2022, canonicalised)", releases[0].PublishDate)
+	}
+}
+
+// TestParseResponse_ImplicitDate proves Jackett's ParseFields case "date":
+// a date field with NO explicit dateparse filter is still run through FromUnknown
+// (harbrr's ParseRelTime). A raw "2 hours ago" must canonicalise against the
+// fixed clock (2023-01-02T00:00:00Z) rather than passing through verbatim. This
+// fails without the implicit-date step.
+func TestParseResponse_ImplicitDate(t *testing.T) {
+	t.Parallel()
+	eng := newFixtureEngine(t, "implicit_date.yml")
+
+	releases, err := eng.ParseResponse(readBody(t, "implicit_date.html"), "")
+	if err != nil {
+		t.Fatalf("ParseResponse: %v", err)
+	}
+	if len(releases) != 1 {
+		t.Fatalf("releases = %d, want 1", len(releases))
+	}
+	if releases[0].PublishDate != "2023-01-01T22:00:00Z" {
+		t.Errorf("publishDate = %q, want 2023-01-01T22:00:00Z (\"2 hours ago\" from the fixed clock)", releases[0].PublishDate)
 	}
 }
 
@@ -255,6 +280,43 @@ func TestExecute_OnlineReplay(t *testing.T) {
 	}
 	if got := doer.requests[len(doer.requests)-1].URL.Query().Get("q"); got != "bunny" {
 		t.Errorf("search query q = %q, want bunny", got)
+	}
+}
+
+// TestSearch_LoginMemoized proves login runs at most once per Engine: the def
+// has a login block and no login.test, so without memoization every Search would
+// re-run the login GET. After two searches exactly one /login.php request must
+// have been issued (the search request hits /browse twice).
+func TestSearch_LoginMemoized(t *testing.T) {
+	t.Parallel()
+
+	def := loadFixtureDef(t, "login_memo.yml")
+	doer := &engineReplay{body: string(readBody(t, "login_memo.html"))}
+	eng, err := NewEngine(def, WithClock(fixedClock()), WithDoer(doer))
+	if err != nil {
+		t.Fatalf("NewEngine: %v", err)
+	}
+
+	for i := 0; i < 2; i++ {
+		if _, err := eng.Search(Query{Keywords: "memo"}); err != nil {
+			t.Fatalf("Search %d: %v", i, err)
+		}
+	}
+
+	loginHits, searchHits := 0, 0
+	for _, req := range doer.requests {
+		switch req.URL.Path {
+		case "/login.php":
+			loginHits++
+		case "/browse":
+			searchHits++
+		}
+	}
+	if loginHits != 1 {
+		t.Errorf("login requests = %d, want 1 (memoized across searches)", loginHits)
+	}
+	if searchHits != 2 {
+		t.Errorf("search requests = %d, want 2 (one per Search)", searchHits)
 	}
 }
 

@@ -19,9 +19,32 @@ var isoLayouts = []string{
 	time.RFC3339Nano,
 	"2006-01-02T15:04:05",
 	"2006-01-02 15:04:05",
+	"2006-01-02 15:04",
 	"2006-01-02",
 	time.RFC1123Z,
 	time.RFC1123,
+}
+
+// humanLayouts are the human-readable absolute formats Jackett's
+// DateTimeUtil.FromUnknown reaches via DateTime.Parse(InvariantCulture) — month
+// names and slash-separated dates that the ISO list does not cover. Without
+// these, an unfiltered date field in such a format would fail ParseRelTime and
+// drop the row, whereas Jackett keeps it. Only unambiguous and invariant
+// (MM/dd/yyyy) forms are included, to avoid guessing on dd/MM ambiguity.
+var humanLayouts = []string{
+	"Jan 2, 2006",
+	"Jan 2 2006",
+	"January 2, 2006",
+	"January 2 2006",
+	"2 Jan 2006",
+	"02 Jan 2006",
+	"2 January 2006",
+	"02 January 2006",
+	"01/02/2006",
+	"01/02/2006 15:04",
+	"01/02/2006 15:04:05",
+	"2006/01/02",
+	"2006/01/02 15:04:05",
 }
 
 // ParseRelTime implements the filter.Registry ParseRelTime seam for the
@@ -68,6 +91,11 @@ func parseAbsolute(v, lower string, now time.Time) (time.Time, bool) {
 		return t, true
 	}
 	for _, layout := range isoLayouts {
+		if t, err := time.Parse(layout, v); err == nil {
+			return t, true
+		}
+	}
+	for _, layout := range humanLayouts {
 		if t, err := time.Parse(layout, v); err == nil {
 			return t, true
 		}
