@@ -47,9 +47,36 @@ func fullRelease() *normalizer.Release {
 		IMDBID:               "tt0903747",
 		TMDBID:               1396,
 		TVDBID:               81189,
+		TVMazeID:             82701,
+		TraktID:              1390,
+		DoubanID:             1291543,
+		RageID:               75682,
 		Year:                 2024,
 		Genre:                "Drama,Crime",
 		Poster:               "https://demo.test/poster/1.jpg",
+	}
+}
+
+// mediaRelease exercises the book/music descriptive torznab:attr fields
+// (author/booktitle/publisher/artist/album/label/track) and their emission order.
+func mediaRelease() *normalizer.Release {
+	return &normalizer.Release{
+		Title:                "Some Audiobook + Album Bundle",
+		Link:                 "https://demo.test/download/3.torrent",
+		Size:                 256000000,
+		Categories:           []int{3030},
+		Seeders:              3,
+		Peers:                3,
+		PublishDate:          "2024-05-01T00:00:00Z",
+		DownloadVolumeFactor: 1,
+		UploadVolumeFactor:   1,
+		Author:               "Jane Author",
+		BookTitle:            "The Book",
+		Publisher:            "Pub House",
+		Artist:               "The Artist",
+		Album:                "The Album",
+		Label:                "The Label",
+		Track:                "Track One",
 	}
 }
 
@@ -95,7 +122,7 @@ func TestMarshalResultsGolden(t *testing.T) {
 		{
 			name:     "feed",
 			golden:   "results/feed.xml",
-			releases: []*normalizer.Release{fullRelease(), magnetOnlyRelease(), minimalBadCharRelease()},
+			releases: []*normalizer.Release{fullRelease(), magnetOnlyRelease(), minimalBadCharRelease(), mediaRelease()},
 		},
 		{
 			name:     "empty",
@@ -256,6 +283,84 @@ func TestResultsGenreWireForm(t *testing.T) {
 	}
 	if !strings.Contains(string(got), `name="genre" value="Drama, Crime, Thriller"`) {
 		t.Errorf("genre not joined with comma+space:\n%s", got)
+	}
+}
+
+// TestResultsNamespaceBinding parses the feed with the REAL Atom/Torznab
+// namespace URIs (the way Sonarr/Radarr's XML reader binds attrs — by namespace
+// URI, not literal prefix) and confirms the atom:link and torznab:attr elements
+// bind correctly. This is the surest check that *arr will parse the feed.
+func TestResultsNamespaceBinding(t *testing.T) {
+	t.Parallel()
+	got, err := MarshalResults(demoFeed(), []*normalizer.Release{fullRelease()}, fixedNow())
+	if err != nil {
+		t.Fatalf("MarshalResults: %v", err)
+	}
+	type nsAttr struct {
+		Name  string `xml:"name,attr"`
+		Value string `xml:"value,attr"`
+	}
+	type nsItem struct {
+		Attrs []nsAttr `xml:"http://torznab.com/schemas/2015/feed attr"`
+	}
+	type nsLink struct {
+		Href string `xml:"href,attr"`
+	}
+	type nsChannel struct {
+		AtomLink nsLink   `xml:"http://www.w3.org/2005/Atom link"`
+		Items    []nsItem `xml:"item"`
+	}
+	var feed struct {
+		Channel nsChannel `xml:"channel"`
+	}
+	if err := xml.Unmarshal(got, &feed); err != nil {
+		t.Fatalf("namespace-aware unmarshal failed (a real *arr would mis-parse): %v", err)
+	}
+	if feed.Channel.AtomLink.Href == "" {
+		t.Error("atom:link did not bind to the Atom namespace")
+	}
+	if len(feed.Channel.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(feed.Channel.Items))
+	}
+	found := map[string]string{}
+	for _, a := range feed.Channel.Items[0].Attrs {
+		found[a.Name] = a.Value
+	}
+	for _, name := range []string{"category", "seeders", "peers", "imdbid", "downloadvolumefactor"} {
+		if _, ok := found[name]; !ok {
+			t.Errorf("torznab:attr %q did not bind to the torznab namespace; bound attrs: %v", name, found)
+		}
+	}
+	if found["seeders"] != "12" {
+		t.Errorf("seeders torznab:attr = %q, want 12", found["seeders"])
+	}
+}
+
+// TestResultsPrivateIndexer confirms a private-indexer release (a download link
+// with an info hash but no public magnet) emits <type>private</type> and an
+// infohash attr, and does NOT emit a magneturl attr.
+func TestResultsPrivateIndexer(t *testing.T) {
+	t.Parallel()
+	feed := demoFeed()
+	feed.Type = "private"
+	r := &normalizer.Release{
+		Title: "Private Release", Link: "https://private.test/dl/9.torrent", Size: 100,
+		InfoHash:   "ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+		Categories: []int{5040}, Seeders: 9, Peers: 9,
+		DownloadVolumeFactor: 1, UploadVolumeFactor: 1,
+	}
+	got, err := MarshalResults(feed, []*normalizer.Release{r}, fixedNow())
+	if err != nil {
+		t.Fatalf("MarshalResults: %v", err)
+	}
+	s := string(got)
+	for _, want := range []string{"<type>private</type>", `name="infohash" value="ABCDEF0123456789ABCDEF0123456789ABCDEF01"`} {
+		if !strings.Contains(s, want) {
+			t.Errorf("private feed missing %q in:\n%s", want, s)
+		}
+	}
+	if strings.Contains(s, `name="magneturl"`) {
+		t.Errorf("private release should not emit a magneturl attr:\n%s", s)
 	}
 }
 

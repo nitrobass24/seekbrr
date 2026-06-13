@@ -14,10 +14,11 @@ const serverTitle = "harbrr"
 
 // Cardigann never customizes the Torznab limits, so harbrr emits Jackett's
 // fixed defaults (TorznabCapabilities ctor: LimitsDefault = LimitsMax = 100).
-// The limit also bounds the served result page (see the request handler).
+// LimitsMax also bounds the served result page — the request handler clamps to
+// it, so the advertised <limits max> and the enforced page size cannot drift.
 const (
-	limitsDefault = 100
-	limitsMax     = 100
+	LimitsDefault = 100
+	LimitsMax     = 100
 )
 
 // capsDocument is the root <caps> element. Field order is the emitted element
@@ -67,7 +68,7 @@ type capsMode struct {
 func MarshalCaps(caps *mapper.Capabilities) ([]byte, error) {
 	doc := capsDocument{
 		Server:     capsServer{Title: serverTitle},
-		Limits:     capsLimits{Default: limitsDefault, Max: limitsMax},
+		Limits:     capsLimits{Default: LimitsDefault, Max: LimitsMax},
 		Searching:  buildSearching(caps),
 		Categories: buildCategoryTree(caps.Categories),
 	}

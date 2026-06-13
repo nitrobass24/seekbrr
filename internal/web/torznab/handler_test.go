@@ -94,6 +94,144 @@ func demoIndexer(t *testing.T) *fakeIndexer {
 	}
 }
 
+// richIndexer advertises every search mode with rich params, for the
+// successful-typed-mode-search tests.
+func richIndexer(t *testing.T) *fakeIndexer {
+	t.Helper()
+	def := &loader.Definition{
+		ID: "rich", Links: []string{"https://rich.test/"},
+		Caps: loader.Caps{
+			CategoryMappings: []loader.CategoryMapping{
+				{ID: loader.Scalar{Value: "1", Set: true}, Cat: "Movies"},
+				{ID: loader.Scalar{Value: "2", Set: true}, Cat: "TV"},
+				{ID: loader.Scalar{Value: "3", Set: true}, Cat: "Audio"},
+				{ID: loader.Scalar{Value: "4", Set: true}, Cat: "Books"},
+			},
+			Modes: loader.Modes{
+				Search:      []string{"q"},
+				TVSearch:    []string{"q", "season", "ep"},
+				MovieSearch: []string{"q", "imdbid"},
+				MusicSearch: []string{"q", "album", "artist", "label", "track"},
+				BookSearch:  []string{"q", "title", "author"},
+			},
+		},
+	}
+	caps, err := mapper.Build(def)
+	if err != nil {
+		t.Fatalf("mapper.Build: %v", err)
+	}
+	return &fakeIndexer{
+		info:     IndexerInfo{ID: "rich", Name: "Rich", Description: "rich", SiteLink: "https://rich.test/", Type: "public"},
+		caps:     caps,
+		releases: []*normalizer.Release{demoRelease("Result", "https://rich.test/dl/1.torrent", []int{2000})},
+	}
+}
+
+// richDo drives a request against the rich indexer at /indexers/rich/.
+func richDo(t *testing.T, idx *fakeIndexer, rawQuery string) *httptest.ResponseRecorder {
+	t.Helper()
+	h := NewHandler(fakeProvider{"rich": idx}, WithAPIKey(testAPIKey),
+		WithClock(func() time.Time { return time.Date(2026, time.June, 13, 12, 0, 0, 0, time.UTC) }))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet,
+		"/api/v2.0/indexers/rich/results/torznab?"+rawQuery+"&apikey="+testAPIKey, nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// TestHandlerTypedModeSearches drives a successful search in each typed mode to a
+// 200 feed and asserts the mode-specific params thread into the engine query.
+func TestHandlerTypedModeSearches(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		query  string
+		verify func(*testing.T, search.Query)
+	}{
+		{"tvsearch", "t=tvsearch&q=show&season=1&ep=2", func(t *testing.T, q search.Query) {
+			if q.Season != "1" || q.Ep != "2" {
+				t.Errorf("season/ep = %q/%q, want 1/2", q.Season, q.Ep)
+			}
+		}},
+		{"movie", "t=movie&q=film&year=2020", func(t *testing.T, q search.Query) {
+			if q.Year != "2020" {
+				t.Errorf("year = %q, want 2020", q.Year)
+			}
+		}},
+		{"music", "t=music&album=A&artist=B&label=L&track=T", func(t *testing.T, q search.Query) {
+			if q.Album != "A" || q.Artist != "B" || q.Label != "L" || q.Track != "T" {
+				t.Errorf("music params = %q/%q/%q/%q, want A/B/L/T", q.Album, q.Artist, q.Label, q.Track)
+			}
+		}},
+		{"book", "t=book&title=Ti&author=Au", func(t *testing.T, q search.Query) {
+			if q.BookTitle != "Ti" || q.Author != "Au" {
+				t.Errorf("book params = %q/%q, want Ti/Au", q.BookTitle, q.Author)
+			}
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			idx := richIndexer(t)
+			rec := richDo(t, idx, tt.query)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200; body:\n%s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), "<item>") {
+				t.Errorf("%s feed has no items:\n%s", tt.name, rec.Body.String())
+			}
+			tt.verify(t, idx.gotQuery)
+		})
+	}
+}
+
+// TestHandlerMalformedParams confirms garbage scalar params degrade cleanly to a
+// valid 200 feed (no panic): bad/zero/over-max limit, negative offset, and a cat
+// list with non-numeric entries.
+func TestHandlerMalformedParams(t *testing.T) {
+	t.Parallel()
+	queries := []string{
+		"t=search&q=x&limit=abc",
+		"t=search&q=x&limit=0",
+		"t=search&q=x&limit=100000",
+		"t=search&q=x&offset=-5",
+		"t=search&q=x&offset=abc",
+		"t=search&q=x&cat=foo,bar",
+		"t=search&q=x&cat=2000,foo",
+	}
+	for _, q := range queries {
+		t.Run(q, func(t *testing.T) {
+			t.Parallel()
+			rec := do(t, newTestHandler(t, demoIndexer(t)), q)
+			if rec.Code != http.StatusOK {
+				t.Errorf("status = %d, want 200 (clean degradation); body:\n%s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), "<channel>") {
+				t.Errorf("malformed-param request did not produce a valid feed:\n%s", rec.Body.String())
+			}
+		})
+	}
+}
+
+// TestHandlerUnmappedCatPassesThrough pins the documented Phase-3 behavior: when
+// every requested cat maps to no tracker category, the query categories are empty
+// and the engine's full result set is returned (Jackett returns empty; this is a
+// [Tracked: Phase 4] divergence).
+func TestHandlerUnmappedCatPassesThrough(t *testing.T) {
+	t.Parallel()
+	idx := demoIndexer(t)
+	rec := do(t, newTestHandler(t, idx), "t=search&cat=9999")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if len(idx.gotQuery.Categories) != 0 {
+		t.Errorf("unmapped cat should yield empty tracker categories, got %v", idx.gotQuery.Categories)
+	}
+	if !strings.Contains(rec.Body.String(), "<item>") {
+		t.Errorf("unmapped cat should still return the engine's releases:\n%s", rec.Body.String())
+	}
+}
+
 // do issues a GET to the torznab endpoint with the given raw query (apikey is
 // appended unless the query already sets one).
 func do(t *testing.T, h http.Handler, rawQuery string) *httptest.ResponseRecorder {

@@ -104,6 +104,10 @@ a fixture authored to dodge it.
 - **`language`/`subs` torznab:attrs never emitted** — harbrr's release has no
   language/subs fields, so these attrs are always absent (Jackett omits them when
   null too). **`[Accepted]`**
+- **`<newznab:response>` paging element omitted** — harbrr does not declare the
+  newznab namespace or emit a `<newznab:response offset="" total="">` element on
+  the feed; Jackett's `ResultPage` omits it too, and Sonarr/Radarr treat it as
+  optional, so the feed is accepted without it. **`[Deliberate]`**
 - **`U+FFFD` handling** — `sanitizeXMLText` strips the Jackett control/BOM/
   noncharacter set and lone surrogates / invalid UTF-8 bytes, but preserves a
   genuine 3-byte `U+FFFD` (which Jackett's regex also preserves). **`[Accepted]`**

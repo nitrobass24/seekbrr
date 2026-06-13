@@ -28,12 +28,15 @@ type capsSubcat struct {
 // every subcat. Custom categories (id >= 100000) are top-level nodes with no
 // subcats.
 //
-// Ordering mirrors Jackett exactly: subcats ascending by id; top-level by the
-// key id>=100000 ? "zzz"+Name : itoa(id) — standard parents ascending by id,
-// then custom cats ascending by name, placed last. (Two known cosmetic
-// divergences are recorded in testdata/README.md: duplicate-custom-id entries
-// collapse here because the mapper de-dups advertised cats by id, and same-name
-// customs tie-break by id rather than Jackett's insertion order.)
+// Ordering mirrors Jackett: subcats ascending by id; top-level by the key
+// id>=100000 ? "zzz"+Name : itoa(id) — standard parents ascending by id, then
+// custom cats by name, placed last. Three cosmetic divergences are recorded in
+// testdata/README.md, all affecting only the document order of top-level
+// <category> nodes (ids/names/membership/subcats are identical, and *arr keys on
+// id): duplicate-custom-id entries collapse (the mapper de-dups advertised cats
+// by id); same-name customs tie-break by id rather than Jackett's insertion
+// order; and the custom "zzz"+Name keys are compared with Go byte-ORDINAL order
+// rather than Jackett's C# CurrentCulture (linguistic) OrderBy.
 func buildCategoryTree(advertised []mapper.Category) []capsCategory {
 	parents := map[string]*capsCategory{}
 	var top []*capsCategory

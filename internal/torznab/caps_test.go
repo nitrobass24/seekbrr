@@ -83,6 +83,28 @@ func TestMarshalCapsGolden(t *testing.T) {
 			def:    jackettModesDef(),
 		},
 		{
+			// Pins the custom-category top-level ORDER (Go byte-ordinal sort of the
+			// "zzz"+Name key), the documented divergence from Jackett's
+			// CurrentCulture OrderBy: harbrr orders Apps/Android, Apps/Linux,
+			// Apps/iOS ('L'=0x4C < 'i'=0x69), where a culture-aware sort would place
+			// iOS between Android and Linux. ids/names/membership are identical; only
+			// document order differs (testdata/README.md).
+			name:   "custom-category-ordinal-sort",
+			golden: "caps/custom-sort.xml",
+			def: &loader.Definition{
+				ID:    "customsort",
+				Links: []string{"https://example.com"},
+				Caps: loader.Caps{
+					CategoryMappings: []loader.CategoryMapping{
+						{ID: scalar("56"), Cat: "PC/Mobile-Android", Desc: "Apps/Android"},
+						{ID: scalar("57"), Cat: "PC/Mobile-iOS", Desc: "Apps/iOS"},
+						{ID: scalar("20"), Cat: "PC", Desc: "Apps/Linux"},
+					},
+					Modes: loader.Modes{Search: []string{"q"}},
+				},
+			},
+		},
+		{
 			name:   "allowrawsearch-and-tvimdb",
 			golden: "caps/allowrawsearch.xml",
 			def: &loader.Definition{

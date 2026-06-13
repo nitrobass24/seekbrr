@@ -24,10 +24,14 @@
       <enclosure url="https://demo.test/download/1.torrent?passkey=synthetic-demo-key" length="5368709120" type="application/x-bittorrent"></enclosure>
       <torznab:attr name="category" value="2040"></torznab:attr>
       <torznab:attr name="category" value="100001"></torznab:attr>
+      <torznab:attr name="rageid" value="75682"></torznab:attr>
       <torznab:attr name="tvdbid" value="81189"></torznab:attr>
       <torznab:attr name="imdb" value="0903747"></torznab:attr>
       <torznab:attr name="imdbid" value="tt0903747"></torznab:attr>
       <torznab:attr name="tmdbid" value="1396"></torznab:attr>
+      <torznab:attr name="tvmazeid" value="82701"></torznab:attr>
+      <torznab:attr name="traktid" value="1390"></torznab:attr>
+      <torznab:attr name="doubanid" value="1291543"></torznab:attr>
       <torznab:attr name="genre" value="Drama, Crime"></torznab:attr>
       <torznab:attr name="year" value="2024"></torznab:attr>
       <torznab:attr name="seeders" value="12"></torznab:attr>
@@ -71,6 +75,30 @@
       <torznab:attr name="category" value="2030"></torznab:attr>
       <torznab:attr name="seeders" value="1"></torznab:attr>
       <torznab:attr name="peers" value="1"></torznab:attr>
+      <torznab:attr name="downloadvolumefactor" value="1"></torznab:attr>
+      <torznab:attr name="uploadvolumefactor" value="1"></torznab:attr>
+    </item>
+    <item>
+      <title>Some Audiobook + Album Bundle</title>
+      <guid>https://demo.test/download/3.torrent</guid>
+      <jackettindexer id="demo">Demo Tracker</jackettindexer>
+      <type>public</type>
+      <pubDate>Wed, 01 May 2024 00:00:00 +0000</pubDate>
+      <size>256000000</size>
+      <description></description>
+      <link>https://demo.test/download/3.torrent</link>
+      <category>3030</category>
+      <enclosure url="https://demo.test/download/3.torrent" length="256000000" type="application/x-bittorrent"></enclosure>
+      <torznab:attr name="category" value="3030"></torznab:attr>
+      <torznab:attr name="author" value="Jane Author"></torznab:attr>
+      <torznab:attr name="booktitle" value="The Book"></torznab:attr>
+      <torznab:attr name="publisher" value="Pub House"></torznab:attr>
+      <torznab:attr name="artist" value="The Artist"></torznab:attr>
+      <torznab:attr name="album" value="The Album"></torznab:attr>
+      <torznab:attr name="label" value="The Label"></torznab:attr>
+      <torznab:attr name="track" value="Track One"></torznab:attr>
+      <torznab:attr name="seeders" value="3"></torznab:attr>
+      <torznab:attr name="peers" value="3"></torznab:attr>
       <torznab:attr name="downloadvolumefactor" value="1"></torznab:attr>
       <torznab:attr name="uploadvolumefactor" value="1"></torznab:attr>
     </item>

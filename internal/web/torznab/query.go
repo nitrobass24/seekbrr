@@ -8,11 +8,13 @@ import (
 	"github.com/autobrr/harbrr/internal/indexer/cardigann/mapper"
 	"github.com/autobrr/harbrr/internal/indexer/cardigann/normalizer"
 	"github.com/autobrr/harbrr/internal/indexer/cardigann/search"
+	tzn "github.com/autobrr/harbrr/internal/torznab"
 )
 
-// defaultLimit bounds the served result page; it matches the caps <limits>
-// default/max (Jackett's 100). A request limit above it is clamped down.
-const defaultLimit = 100
+// defaultLimit bounds the served result page; it is the same constant the caps
+// document advertises as <limits max>, so the advertised and enforced page sizes
+// cannot drift. A request limit above it is clamped down.
+const defaultLimit = tzn.LimitsMax
 
 // buildQuery maps the Torznab/Newznab request params to the engine's search
 // query. The `cat` newznab ids are resolved to tracker category ids through the
