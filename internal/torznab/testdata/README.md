@@ -50,9 +50,7 @@ Deliberate or accepted differences, each with an explicit disposition
 (`[Tracked: Phase N]` a real gap with a plan follow-up · `[Deliberate]` an
 intentional design choice · `[Accepted]` a kept difference, no work planned),
 mirroring `../../indexer/cardigann/parity/testdata/README.md`. None is hidden by
-a fixture authored to dodge it. The HTTP-handler-specific entries (error-code
-status policy, `atom:link` self URL, `cat`/`limit`/`offset`, default categories,
-result-category filtering) are added with that commit.
+a fixture authored to dodge it.
 
 ### Caps document
 
@@ -113,3 +111,40 @@ result-category filtering) are added with that commit.
   magnet link (which legitimately carries a passkey — intended output, never
   logged); it does not yet rewrite links to a proxy `/dl` endpoint or run the
   download resolver. **`[Tracked: Phase 4]`**
+
+### HTTP handler (`internal/web/torznab`)
+
+- **Error-code + HTTP-status policy** — harbrr returns the published
+  Newznab/Torznab codes: 100 (HTTP 200) bad apikey, 201 (HTTP 200) unknown
+  indexer, 202 (HTTP 400) unknown `t`, 203 (HTTP 400) unadvertised mode or an
+  unsupported id param, 900 (HTTP 500) internal error. Jackett funnels unknown-`t`
+  and unadvertised-mode through its `CanHandleQuery=false` path to code 201 at
+  HTTP 200, and uses HTTP 400 for 900. Sonarr/Radarr key off the `<error code>` in
+  the body (codes ≥200 collapse to one exception) and ignore the HTTP status for
+  an XML error body, so the two are *arr-equivalent; harbrr keeps the
+  spec-accurate codes. **`[Deliberate]`**
+- **`atom:link` self URL** — built from the request scheme/host/path with the
+  query string dropped (so the apikey is never reflected) and routed through
+  `RedactURL`; Jackett uses the bare configured server base URL. Equivalent for
+  *arr (the self link is informational). **`[Deliberate]`**
+- **id-param gating** — matches Jackett's `ResultsController`: `imdbid`/`tmdbid`
+  are rejected (203) only for movie/tv search when the mode does not advertise
+  them; `tvdbid` is never param-gated (Jackett gates it only on tv-search
+  availability), and general/music/book search never gate an id param — the param
+  is accepted and the search degrades to keywords. Parity-positive, recorded so
+  the gate scope is explicit.
+- **`genre` / `publisher` search params** — `search.Query` has no `Genre` or
+  `Publisher` field, so a `genre=`/`publisher=` request param is not threaded into
+  the engine's template namespace (a def whose request template reads them renders
+  them empty). No vendored fixture relies on this. **`[Accepted]`**
+- **`limit`/`offset`** — applied at serialize time over the engine's full result
+  set: `limit` is clamped to `[1, 100]`; a non-zero `offset` slices the page,
+  whereas Jackett returns an empty set for `offset > 0` on a non-paginating
+  Cardigann indexer. De-duplication runs before the limit slice (Jackett limits
+  then de-dups), so counts can differ on a duplicate-heavy page. **`[Deliberate]`**
+- **Result-category filtering / default categories** — harbrr does not yet drop
+  releases whose categories miss the query categories (`FilterResults`), return an
+  empty feed when every requested `cat` maps to no tracker category, or substitute
+  a definition's `default: true` categories when the mapped tracker-category list
+  is empty. A category-constrained search therefore returns the engine's full row
+  set. **`[Tracked: Phase 4]`**

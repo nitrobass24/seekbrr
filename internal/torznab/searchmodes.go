@@ -45,13 +45,14 @@ var searchModes = []searchMode{
 
 // available reports whether the indexer advertises this mode. "search" is always
 // available (Cardigann requires it; Jackett SearchAvailable defaults true); any
-// other mode is available iff the definition declares it in caps.modes.
+// other mode is available iff the definition declares it with at least one param,
+// matching Jackett's XxxSearchAvailable => XxxSearchParams.Count > 0 (a
+// declared-but-empty list like `movie-search: []` is not available).
 func (m searchMode) available(caps *mapper.Capabilities) bool {
 	if m.capsKey == mapper.ModeSearch {
 		return true
 	}
-	_, ok := caps.Modes[m.capsKey]
-	return ok
+	return len(caps.Modes[m.capsKey]) > 0
 }
 
 // supportedParams returns the comma-joined canonical supported-param string for
@@ -104,4 +105,44 @@ func modeForRequest(req string) (searchMode, bool) {
 		}
 	}
 	return searchMode{}, false
+}
+
+// modeByCapsKey resolves a caps.modes key to its search mode.
+func modeByCapsKey(capsKey string) (searchMode, bool) {
+	for _, m := range searchModes {
+		if m.capsKey == capsKey {
+			return m, true
+		}
+	}
+	return searchMode{}, false
+}
+
+// ModeForRequest resolves a Torznab t= token (search, tvsearch, movie, music,
+// book) to its caps.modes key for the request handler. ok is false for an
+// unknown token (the caller handles t=caps separately and rejects others).
+func ModeForRequest(t string) (capsKey string, ok bool) {
+	m, found := modeForRequest(t)
+	if !found {
+		return "", false
+	}
+	return m.capsKey, true
+}
+
+// ModeAvailable reports whether the indexer's capabilities advertise the mode
+// identified by capsKey (the request handler rejects an unadvertised mode).
+func ModeAvailable(caps *mapper.Capabilities, capsKey string) bool {
+	m, ok := modeByCapsKey(capsKey)
+	return ok && m.available(caps)
+}
+
+// SupportsParam reports whether the mode identified by capsKey advertises the
+// canonical Torznab param (e.g. "imdbid", "tmdbid", "tvdbid"), so the request
+// handler can reject an id search the indexer does not support (error 203)
+// instead of silently degrading it to a keyword search.
+func SupportsParam(caps *mapper.Capabilities, capsKey, param string) bool {
+	m, ok := modeByCapsKey(capsKey)
+	if !ok {
+		return false
+	}
+	return m.paramEnabled(param, declaredParamSet(caps.Modes[capsKey]), caps)
 }
