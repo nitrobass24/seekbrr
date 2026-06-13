@@ -50,7 +50,7 @@ decoupled.
 - [x] Wire `internal/indexer/cardigann/parity` to the real engine (replace the stub `Process`)
 - [ ] Pass the **compatibility matrix** offline rows (each archetype has a fixture):
   - [x] HTML / form login
-  - [ ] HTML / cookie login
+  - [x] HTML / cookie login
   - [x] JSON-API
   - [ ] XML / Newznab
   - [x] non-Latin-script (regexp2 path)
