@@ -27,7 +27,9 @@ complexity linters enforce it) and makes the parity harness tractable.
 1. **Definitions are consumed byte-for-byte.** All behavioral differences live in the engine, never in
    the def files. `vendor/` is read-only (a hook enforces it); overrides go in `dropin/`.
 2. **Correctness = parity with Jackett's engine on the same input**, established offline. Per-def-vs-live
-   correctness is the corpus's responsibility, not ours.
+   correctness is the corpus's responsibility, not ours. Every deliberate or accepted difference from
+   Jackett/the spec is recorded once, next to its fixtures, with a `[Tracked]`/`[Deliberate]`/`[Accepted]`
+   disposition; `divergences.md` is the index.
 3. **Two HTTP contracts, kept separate.** Torznab/Newznab (XML, `internal/torznab`) is the *arr-facing
    contract; the OpenAPI surface (`internal/web/swagger`) is harbrr's own management API. They evolve
    independently.
