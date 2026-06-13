@@ -128,7 +128,7 @@ type Search struct {
 	Path                 string              `yaml:"path,omitempty"`
 	Paths                []SearchPathBlock   `yaml:"paths,omitempty"`
 	AllowEmptyInputs     *bool               `yaml:"allowEmptyInputs,omitempty"`
-	Inputs               map[string]Scalar   `yaml:"inputs,omitempty"`
+	Inputs               InputsBlock         `yaml:"inputs,omitempty"`
 	Headers              map[string][]string `yaml:"headers,omitempty"`
 	KeywordsFilters      []FilterBlock       `yaml:"keywordsfilters,omitempty"`
 	Error                []ErrorBlock        `yaml:"error,omitempty"`
@@ -139,14 +139,14 @@ type Search struct {
 
 // SearchPathBlock mirrors SearchPathBlock.
 type SearchPathBlock struct {
-	Path           string            `yaml:"path"`
-	Method         string            `yaml:"method,omitempty"`
-	FollowRedirect *bool             `yaml:"followredirect,omitempty"`
-	Categories     []Scalar          `yaml:"categories,omitempty"`
-	Inputs         map[string]Scalar `yaml:"inputs,omitempty"`
-	InheritInputs  *bool             `yaml:"inheritinputs,omitempty"`
-	QuerySeparator string            `yaml:"queryseparator,omitempty"`
-	Response       *ResponseBlock    `yaml:"response,omitempty"`
+	Path           string         `yaml:"path"`
+	Method         string         `yaml:"method,omitempty"`
+	FollowRedirect *bool          `yaml:"followredirect,omitempty"`
+	Categories     []Scalar       `yaml:"categories,omitempty"`
+	Inputs         InputsBlock    `yaml:"inputs,omitempty"`
+	InheritInputs  *bool          `yaml:"inheritinputs,omitempty"`
+	QuerySeparator string         `yaml:"queryseparator,omitempty"`
+	Response       *ResponseBlock `yaml:"response,omitempty"`
 }
 
 // ResponseBlock mirrors ResponseBlock.
@@ -243,6 +243,73 @@ func (fb FieldsBlock) Names() []string {
 
 // Len reports the number of fields.
 func (fb FieldsBlock) Len() int { return len(fb.keys) }
+
+// InputEntry is one (key, value) search input in definition order.
+type InputEntry struct {
+	Key   string
+	Value Scalar
+}
+
+// InputsBlock is an order-preserving search-inputs map. Jackett builds the GET
+// query / POST body by iterating Search.Inputs then SearchPath.Inputs in
+// DEFINITION ORDER and appending each pair to an ordered collection
+// (CardigannIndexer.PerformQuery), so the rendered query reproduces the def's
+// key order — a plain Go map would randomize it and diverge from Jackett. This
+// mirrors FieldsBlock: keys records source order, values the scalars.
+type InputsBlock struct {
+	keys   []string
+	values map[string]Scalar
+}
+
+// NewInputsBlock builds an InputsBlock from ordered entries, preserving the
+// given order (first position, last value on a duplicate key). The loader builds
+// these via UnmarshalYAML; this constructor is for assembling definitions
+// directly (e.g. in tests) without losing order to a Go map literal.
+func NewInputsBlock(entries ...InputEntry) InputsBlock {
+	ib := InputsBlock{values: make(map[string]Scalar, len(entries))}
+	for _, e := range entries {
+		if _, seen := ib.values[e.Key]; !seen {
+			ib.keys = append(ib.keys, e.Key)
+		}
+		ib.values[e.Key] = e.Value
+	}
+	return ib
+}
+
+// UnmarshalYAML decodes a mapping node into an order-preserving InputsBlock,
+// keeping a duplicate key's FIRST position but LAST value (go-yaml map
+// semantics), exactly as FieldsBlock does.
+func (ib *InputsBlock) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("inputs: expected a mapping, got %s", kindName(node.Kind))
+	}
+	ib.keys = ib.keys[:0]
+	ib.values = make(map[string]Scalar, len(node.Content)/2)
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		key := node.Content[i].Value
+		var v Scalar
+		if err := node.Content[i+1].Decode(&v); err != nil {
+			return fmt.Errorf("inputs: decoding input %q: %w", key, err)
+		}
+		if _, seen := ib.values[key]; !seen {
+			ib.keys = append(ib.keys, key)
+		}
+		ib.values[key] = v
+	}
+	return nil
+}
+
+// Ordered returns the input entries in definition (YAML) order.
+func (ib InputsBlock) Ordered() []InputEntry {
+	out := make([]InputEntry, 0, len(ib.keys))
+	for _, k := range ib.keys {
+		out = append(out, InputEntry{Key: k, Value: ib.values[k]})
+	}
+	return out
+}
+
+// Len reports the number of inputs.
+func (ib InputsBlock) Len() int { return len(ib.keys) }
 
 // DownloadBlock mirrors DownloadBlock.
 type DownloadBlock struct {

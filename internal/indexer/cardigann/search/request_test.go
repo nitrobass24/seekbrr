@@ -29,7 +29,7 @@ func TestBuildRequests_GET(t *testing.T) {
 		Links: []string{"https://get.invalid/"},
 		Search: loader.Search{
 			Path:   "/browse.php",
-			Inputs: map[string]loader.Scalar{"q": {Value: "{{ .Keywords }}", Set: true}},
+			Inputs: loader.NewInputsBlock(loader.InputEntry{Key: "q", Value: loader.Scalar{Value: "{{ .Keywords }}", Set: true}}),
 			Paths:  nil,
 		},
 	}
@@ -70,7 +70,7 @@ func TestBuildRequests_POST(t *testing.T) {
 	def := &loader.Definition{
 		Links: []string{"https://post.invalid/"},
 		Search: loader.Search{
-			Inputs: map[string]loader.Scalar{"search": {Value: "{{ .Keywords }}", Set: true}},
+			Inputs: loader.NewInputsBlock(loader.InputEntry{Key: "search", Value: loader.Scalar{Value: "{{ .Keywords }}", Set: true}}),
 			Paths: []loader.SearchPathBlock{{
 				Path:   "/api/search",
 				Method: "post",
@@ -112,10 +112,8 @@ func TestBuildRequests_ConfigInput(t *testing.T) {
 	def := &loader.Definition{
 		Links: []string{"https://cfg.invalid/"},
 		Search: loader.Search{
-			Inputs: map[string]loader.Scalar{
-				"passkey": {Value: "{{ .Config.passkey }}", Set: true},
-			},
-			Paths: []loader.SearchPathBlock{{Path: "/t"}},
+			Inputs: loader.NewInputsBlock(loader.InputEntry{Key: "passkey", Value: loader.Scalar{Value: "{{ .Config.passkey }}", Set: true}}),
+			Paths:  []loader.SearchPathBlock{{Path: "/t"}},
 		},
 	}
 
@@ -126,6 +124,69 @@ func TestBuildRequests_ConfigInput(t *testing.T) {
 	u, _ := url.Parse(reqs[0].url)
 	if u.Query().Get("passkey") != passkey {
 		t.Errorf("passkey query = %q, want %q", u.Query().Get("passkey"), passkey)
+	}
+}
+
+// TestBuildRequests_InputOrder proves search inputs render in DEFINITION order,
+// not alphabetical. Jackett appends inputs to an ordered collection as it
+// iterates Search.Inputs (CardigannIndexer.PerformQuery); a Go map or a
+// sorted-keys encoder would reorder zeta/alpha/mu and diverge from Jackett's
+// request URL. This test fails with the previous sorted-keys behavior.
+func TestBuildRequests_InputOrder(t *testing.T) {
+	t.Parallel()
+
+	inherit := true
+	def := &loader.Definition{
+		Links: []string{"https://order.invalid/"},
+		Search: loader.Search{
+			Inputs: loader.NewInputsBlock(
+				loader.InputEntry{Key: "zeta", Value: loader.Scalar{Value: "1", Set: true}},
+				loader.InputEntry{Key: "alpha", Value: loader.Scalar{Value: "2", Set: true}},
+				loader.InputEntry{Key: "mu", Value: loader.Scalar{Value: "3", Set: true}},
+			),
+			Paths: []loader.SearchPathBlock{{Path: "/s", InheritInputs: &inherit}},
+		},
+	}
+
+	reqs, err := buildRequests(def, Query{}, testDeps("https://order.invalid/", nil))
+	if err != nil {
+		t.Fatalf("buildRequests: %v", err)
+	}
+	u, err := url.Parse(reqs[0].url)
+	if err != nil {
+		t.Fatalf("parsing built URL: %v", err)
+	}
+	if want := "zeta=1&alpha=2&mu=3"; u.RawQuery != want {
+		t.Errorf("query = %q, want %q (definition order, not alphabetical)", u.RawQuery, want)
+	}
+}
+
+// TestBuildRequests_EmbeddedQueryPreserved proves an embedded path query is kept
+// VERBATIM — order and empty values intact — and inputs append after it without
+// re-encoding. The JSON-API archetype (UNIT3D) builds the entire query inside
+// the path with no inputs; re-encoding via url.Values would alphabetize it
+// (api_token, name, page, perPage, sortField) and break request parity.
+func TestBuildRequests_EmbeddedQueryPreserved(t *testing.T) {
+	t.Parallel()
+
+	embedded := "api_token=&name=1080p&sortField=created_at&perPage=100&page=1"
+	def := &loader.Definition{
+		Links: []string{"https://embed.invalid/"},
+		Search: loader.Search{
+			Paths: []loader.SearchPathBlock{{Path: "/api/torrents/filter?" + embedded}},
+		},
+	}
+
+	reqs, err := buildRequests(def, Query{}, testDeps("https://embed.invalid/", nil))
+	if err != nil {
+		t.Fatalf("buildRequests: %v", err)
+	}
+	u, err := url.Parse(reqs[0].url)
+	if err != nil {
+		t.Fatalf("parsing built URL: %v", err)
+	}
+	if u.RawQuery != embedded {
+		t.Errorf("query = %q, want %q (verbatim, not re-sorted)", u.RawQuery, embedded)
 	}
 }
 
