@@ -83,6 +83,13 @@ These are deliberate or accepted differences from Jackett's Cardigann engine,
 documented so a passing gate is honest about what it does and does not match.
 None is exercised (and thus hidden) by a fixture authored to dodge it.
 
+**Scope:** this section covers the **engine** layer (a saved tracker response →
+normalized release). Output-side differences (the served Torznab/Newznab XML +
+the *arr HTTP handler) live in
+[`internal/torznab/testdata/README.md`](../../../../torznab/testdata/README.md).
+[`docs/divergences.md`](../../../../../docs/divergences.md) is the single index of
+both and the shared disposition rule.
+
 Every entry carries an explicit **disposition** so the list is a complete
 decision record, not a half-tracked backlog:
 

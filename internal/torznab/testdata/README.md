@@ -48,9 +48,15 @@ precedence) is reproduced from `ResultPage.ToXml` / `ReleaseInfo` /
 
 Deliberate or accepted differences, each with an explicit disposition
 (`[Tracked: Phase N]` a real gap with a plan follow-up · `[Deliberate]` an
-intentional design choice · `[Accepted]` a kept difference, no work planned),
-mirroring `../../indexer/cardigann/parity/testdata/README.md`. None is hidden by
-a fixture authored to dodge it.
+intentional design choice · `[Accepted]` a kept difference, no work planned).
+None is hidden by a fixture authored to dodge it.
+
+**Scope:** this section covers the **Torznab output** layer (normalized release →
+served XML + the *arr HTTP handler). Engine-side differences (extraction,
+login, request building, parsing) live in
+[`../../indexer/cardigann/parity/testdata/README.md`](../../indexer/cardigann/parity/testdata/README.md).
+[`docs/divergences.md`](../../../docs/divergences.md) is the single index of both
+and the shared disposition rule.
 
 ### Caps document
 
