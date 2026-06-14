@@ -51,6 +51,18 @@ The behaviours below are pinned by tests in `internal/secrets`, `internal/auth`,
   driver-agnostic (`internal/database/sessionstore.go`); the official
   `alexedwards/scs/sqlite3store` imports the cgo `mattn` driver, which would break
   the pure-Go `CGO_ENABLED=0` cross-build. `[Deliberate]`
+- **Session-cookie `Secure` is operator-configured, not auto-detected.** §9 says
+  "Secure behind TLS"; harbrr sets it from `server.secure_cookie` (default false)
+  rather than auto-setting it per request from `X-Forwarded-Proto` (as autobrr
+  does), because mutating the shared SCS cookie config per request is racy. The
+  documented deployment is TLS terminated at a reverse proxy with the flag set.
+  (`cmd/harbrr/serve.go` sessionManager.) `[Deliberate]`
+- **One bearer-token namespace for the feed apikey.** The *arr-facing Torznab
+  `?apikey` is validated against the same hashed `api_keys` table as the management
+  `X-API-Key` (any minted key authorizes the feed), rather than a single dedicated
+  Torznab key as in Jackett/Prowlarr. This matches §9 treating both as the
+  bearer-token class and lets a user mint one key for both surfaces.
+  (`cmd/harbrr/serve.go` apiKeyValidator → `auth.ValidateAPIKey`.) `[Deliberate]`
 
 ## Tracked gaps (carry a `docs/plan.md` item)
 
@@ -62,3 +74,7 @@ The behaviours below are pinned by tests in `internal/secrets`, `internal/auth`,
 - **`api_keys.last_used_at` is never written.** Validation is a pure read (no
   write on the request path); a debounced "touch" lands later.
   `[Tracked: Phase 6]` (health/stats).
+- **Safe export/import not built.** §9 describes a config/DB export that redacts
+  secrets behind the `<redacted>` sentinel by default with a separately-encrypted
+  include-secrets opt-in. The `<redacted>` sentinel exists for the edit/update flow;
+  the export/import path itself is deferred. `[Tracked: Phase 7]` (backup/restore).
