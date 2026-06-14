@@ -169,3 +169,7 @@ Phase 3 "search real trackers end-to-end" goal.
 - Never hand-edit `internal/indexer/definitions/vendor/` — absorb differences in the engine.
 - Never log/commit secrets. Always `-race -count=1`. Keep functions small (the linters enforce it).
 - One plan item per commit; conventional-commit messages; no AI attribution lines.
+- **Capture highlights as you go.** When a phase lands a user-facing or competitive
+  improvement over Prowlarr/Jackett/qui, add it to `docs/highlights.md` (honestly
+  labeled `[shipped]`/`[partial]`/`[planned]`, with a real citation) so the "why
+  harbrr" list is ready when the site/docs are published.
