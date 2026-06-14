@@ -24,8 +24,12 @@ func GenerateAPIKey() (string, error) {
 }
 
 // HashToken returns the SHA-256 hex digest stored for an API key or session
-// token. A plain SHA-256 (no salt) is correct here because the input is
-// already high-entropy random, unlike a user-chosen password.
+// token. A plain SHA-256 (no salt, no slow KDF) is the correct construction here
+// because the input is a 256-bit cryptographically-random token, not a
+// low-entropy user-chosen secret — a slow hash buys nothing against a value that
+// cannot be brute-forced or guessed. Passwords are NEVER hashed here; they go
+// through argon2id (HashPassword). This is why a static analyzer flagging SHA-256
+// on "sensitive data" is a false positive for this function.
 func HashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
