@@ -121,10 +121,12 @@ Phase 3 "search real trackers end-to-end" goal.
       "Known divergences"). Done via `internal/indexer/cardigann/encode`; verified divergence is `!*()`
       + `~` (not `'`). Login form bodies deferred as a deliberate divergence.
 - [ ] Fetch/auth matrix rows as available: Cloudflare/FlareSolverr (pluggable solver) · 2FA/manual-cookie
-- [ ] **Result-category filtering + default categories**: drop result rows whose categories miss the query
-      cats (Jackett `FilterResults`), return an empty feed when every requested `cat` maps to no tracker
-      category, and substitute a def's `default: true` categories when the mapped tracker-cat list is empty
-      (request/response category parity for live *arr search; see `internal/torznab/testdata/README.md`)
+- [x] **Result-category filtering + default categories**: drop result rows whose categories miss the query
+      cats (Jackett `FilterResults`) and substitute a def's `default: true` categories when the mapped
+      tracker-cat list is empty (request/response category parity for live *arr search; see
+      `internal/torznab/testdata/README.md`). Note: Jackett does not force an empty feed when a `cat` maps
+      to nothing — it searches defaults/all and the response filter drops non-matches (empty emerges
+      naturally). Done in `internal/web/torznab/filter.go` + `query.go` + mapper `DefaultCategories`.
 - [ ] **Serve resolved/proxied download links**: wire the engine's `ResolveDownload` into the served feed
       (optionally via a `/dl` proxy endpoint) so a grabbed release downloads through harbrr's session rather
       than the raw tracker link; depends on the Phase 7 resolver completion. See `internal/torznab/testdata/README.md`

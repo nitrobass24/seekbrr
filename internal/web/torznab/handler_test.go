@@ -217,7 +217,12 @@ func TestHandlerMalformedParams(t *testing.T) {
 // every requested cat maps to no tracker category, the query categories are empty
 // and the engine's full result set is returned (Jackett returns empty; this is a
 // [Tracked: Phase 4] divergence).
-func TestHandlerUnmappedCatPassesThrough(t *testing.T) {
+// TestHandlerUnmappedCatFiltersResults: a requested cat that maps to no tracker
+// category drives the search with no tracker categories (the demo def declares no
+// default:true cats), and the response-side category filter (Jackett
+// FilterResults) drops releases whose categories don't intersect the requested
+// cat. The demo release is category 2000, so cat=9999 yields an empty feed.
+func TestHandlerUnmappedCatFiltersResults(t *testing.T) {
 	t.Parallel()
 	idx := demoIndexer(t)
 	rec := do(t, newTestHandler(t, idx), "t=search&cat=9999")
@@ -227,8 +232,8 @@ func TestHandlerUnmappedCatPassesThrough(t *testing.T) {
 	if len(idx.gotQuery.Categories) != 0 {
 		t.Errorf("unmapped cat should yield empty tracker categories, got %v", idx.gotQuery.Categories)
 	}
-	if !strings.Contains(rec.Body.String(), "<item>") {
-		t.Errorf("unmapped cat should still return the engine's releases:\n%s", rec.Body.String())
+	if strings.Contains(rec.Body.String(), "<item>") {
+		t.Errorf("unmapped cat should filter out the category-2000 release:\n%s", rec.Body.String())
 	}
 }
 

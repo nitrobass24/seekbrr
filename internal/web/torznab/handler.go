@@ -135,12 +135,16 @@ func (h *handler) writeResults(w http.ResponseWriter, r *http.Request, idx Index
 	if !h.resolveMode(w, q, caps) {
 		return
 	}
-	releases, err := idx.Search(buildQuery(q, caps))
+	query, requestedCats := buildQuery(q, caps)
+	releases, err := idx.Search(query)
 	if err != nil {
 		h.writeInternalError(w, "search", idx.Info().ID, err)
 		return
 	}
-	releases = parsePaging(q).apply(dedupeByGUID(releases))
+	// Jackett pipeline order: FixResults (dedupe) -> FilterResults (category drop
+	// + limit). Category filtering runs after dedupe and before paging.
+	releases = filterResults(dedupeByGUID(releases), requestedCats, caps)
+	releases = parsePaging(q).apply(releases)
 	body, err := tzn.MarshalResults(h.feedInfo(r, idx), releases, h.clock())
 	if err != nil {
 		h.writeInternalError(w, "results", idx.Info().ID, err)
