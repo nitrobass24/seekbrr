@@ -98,7 +98,17 @@ production `Provider` the handler resolves through.)
 5 real trackers driven through the running daemon by an actual Sonarr/Radarr — the live half of the
 Phase 3 "search real trackers end-to-end" goal.
 
-- [ ] 5 real trackers, live login/session, gentle rate
+> **Execution protocol (decided).** During the Phase 5 planning step the user hands over the **tracker
+> credentials** directly (passkey/cookie/login) — they can't be lifted from Prowlarr's API, which masks
+> them (see Phase 8) — and the **API keys for the *arr (Sonarr/Radarr) + Prowlarr**. The agent then
+> **selects the 5 trackers** for the smoke test, restricted to **non-Cloudflare** sites (the test
+> environment runs no FlareSolverr/proxy). The test bed is a single local Docker LAN that already
+> includes qBittorrent + qui (for the grab half); Prowlarr doubles as a live differential oracle
+> (same query → Prowlarr feed vs harbrr feed → diff). Treat creds per AGENTS.md (never logged/committed;
+> entered into harbrr's encrypted store, redacted everywhere).
+
+- [ ] 5 real **non-Cloudflare** trackers (agent-selected; no FlareSolverr in the test env), live
+      login/session, gentle rate
 - [ ] **Robustness proof** (carried from Phase 3, which is verified offline only): a real
       Sonarr/Radarr parses the served caps and completes search → **grab** end-to-end against the live
       trackers (not just a 200 feed), and an offline serializer fuzz/property test asserts arbitrary
@@ -151,8 +161,12 @@ Phase 3 "search real trackers end-to-end" goal.
 - [ ] **\*arr application sync** (qui-as-app): push indexer config into Sonarr/Radarr/Lidarr/… via their
       API — the sync contract + add/update/remove lifecycle + per-app enable/disable (its own sub-plan; a
       Prowlarr headline feature)
-- [ ] **Jackett/Prowlarr migration import**: import indexer instances + credentials + category overrides
-      from a Jackett/Prowlarr config
+- [ ] **Jackett/Prowlarr migration import**: import indexer instances + credentials + category overrides.
+      Read credentials from the **Prowlarr SQLite database** (`prowlarr.db`, the `Indexers.Settings`
+      JSON column), which stores them in plaintext — NOT the REST API, whose `SchemaBuilder` masks
+      `ApiKey`/`Password` fields with `********` (verified against Prowlarr source; see
+      `docs/divergences.md` / the secrets testdata README). Jackett's config encrypts creds per-install
+      (RSA/DPAPI), so a Jackett import falls back to guided re-entry for the protected fields.
 - [ ] Native **harbrr → autobrr push** (closes the RSS-polling gap; family-only win)
 - [ ] cross-seed search backend
 - [ ] **Stats / search history** (query/grab/auth event log + query API; the auth event log populates
