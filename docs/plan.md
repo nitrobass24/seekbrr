@@ -121,7 +121,11 @@ Phase 3 "search real trackers end-to-end" goal.
       they match `WebUtility.UrlEncode` (Phase 2 leaves these escaped; see `parity/testdata/README.md`
       "Known divergences"). Done via `internal/indexer/cardigann/encode`; verified divergence is `!*()`
       + `~` (not `'`). Login form bodies deferred as a deliberate divergence.
-- [ ] Fetch/auth matrix rows as available: Cloudflare/FlareSolverr (pluggable solver) · 2FA/manual-cookie
+- [x] Fetch/auth matrix rows as available: pluggable solver SEAM (`login.Solver`) wired into the login
+      anti-bot path via `WithSolver`; `ManualCookieSolver` (2FA/manual-cookie) is functional, selected by
+      a `solver_type=manual_cookie` setting + the encrypted `cookie` setting (no migration — rides the
+      existing settings map; `cardigann.SolverOption`). **FlareSolverr deferred to Phase 6** (no infra in
+      env; the 5 smoke trackers are non-CF) — `NoopSolver` default keeps the fail-loud behavior.
 - [x] **Result-category filtering + default categories**: drop result rows whose categories miss the query
       cats (Jackett `FilterResults`) and substitute a def's `default: true` categories when the mapped
       tracker-cat list is empty (request/response category parity for live *arr search; see

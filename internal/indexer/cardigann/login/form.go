@@ -36,11 +36,10 @@ func (e *Executor) loginForm(def *loader.Definition) error {
 	if err != nil {
 		return err
 	}
-	body, _, err := e.get(landingURL, def.Login.Headers)
+	// Fetch the landing page, routing an anti-bot interstitial through the
+	// configured solver (NoopSolver by default => fail loud, unchanged behaviour).
+	body, err := e.fetchLandingPastAntiBot(landingURL, def.Login.Headers)
 	if err != nil {
-		return err
-	}
-	if err := detectAntiBot(body); err != nil {
 		return err
 	}
 

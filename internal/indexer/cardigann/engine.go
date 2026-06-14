@@ -60,6 +60,7 @@ type options struct {
 	config  map[string]string
 	clock   func() time.Time
 	baseURL string
+	solver  login.Solver
 }
 
 // Option configures the Engine at construction.
@@ -86,6 +87,27 @@ func WithClock(fn func() time.Time) Option {
 // paths and release URLs. Defaults to the definition's first link.
 func WithBaseURL(u string) Option {
 	return func(o *options) { o.baseURL = u }
+}
+
+// WithSolver injects an anti-bot solver (login interstitials). Unset leaves the
+// login executor's default NoopSolver (fail loud on a challenge).
+func WithSolver(s login.Solver) Option {
+	return func(o *options) { o.solver = s }
+}
+
+// SolverOption returns the engine option wiring an anti-bot solver from an
+// instance's resolved .Config (the "solver_type" setting):
+//   - "manual_cookie" replays the encrypted "cookie" setting (ManualCookieSolver);
+//   - anything else (including unset) leaves the default NoopSolver.
+//
+// FlareSolverr is the Phase 6 addition. Keeping the mapping here lets the registry
+// wire a solver from config without importing the login package directly.
+func SolverOption(cfg map[string]string) Option {
+	if cfg["solver_type"] == "manual_cookie" {
+		s := login.ManualCookieSolver{Cookie: cfg["cookie"]}
+		return func(o *options) { o.solver = s }
+	}
+	return func(*options) {}
 }
 
 // NewEngine builds an Engine for def, wiring all nine stage seams. It fails loud
@@ -176,6 +198,7 @@ func buildLogin(o options) *login.Executor {
 		login.WithClient(o.doer),
 		login.WithBaseURL(o.baseURL),
 		login.WithConfig(o.config),
+		login.WithSolver(o.solver),
 	)
 }
 
