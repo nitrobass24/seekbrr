@@ -228,6 +228,9 @@ func (e *Executor) resolveFormTarget(l *loader.Login, form *goquery.Selection, l
 // error selectors. Distinct from postForm (methods.go), which resolves a
 // definition path; the form flow has already resolved its target via the form
 // action.
+//
+// Form body uses url.Values.Encode — see postForm (methods.go) for the deliberate
+// Phase 5 login form-encoding divergence note.
 func (e *Executor) postFormAbsolute(l *loader.Login, target string, pairs url.Values) error {
 	headers := mergeFormHeaders(l.Headers)
 	body, status, err := e.do("POST", target, strings.NewReader(pairs.Encode()), headers)
