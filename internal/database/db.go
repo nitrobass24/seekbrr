@@ -3,7 +3,9 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,12 +49,8 @@ type DB struct {
 // ephemeral test database. The data directory is created 0700; file permissions
 // are tightened by Migrate via secureDBFiles once the side files exist.
 func Open(path string) (*DB, error) {
-	if !isMemory(path) {
-		if dir := filepath.Dir(path); dir != "" {
-			if err := os.MkdirAll(dir, dirPerm); err != nil {
-				return nil, fmt.Errorf("database: create data dir %q: %w", dir, err)
-			}
-		}
+	if err := ensureDataDir(path); err != nil {
+		return nil, err
 	}
 
 	sqlDB, err := sql.Open("sqlite", dsnFor(path))
@@ -71,6 +69,27 @@ func Open(path string) (*DB, error) {
 	}
 
 	return &DB{sql: sqlDB, dialect: dbinterface.DialectSQLite, path: path}, nil
+}
+
+// ensureDataDir creates the database's parent directory (0700) and tightens its
+// mode even when it already existed — MkdirAll leaves an existing dir's mode
+// untouched, so a Docker volume or a prior looser run is still corrected to the
+// owner-only policy. It is a no-op for an in-memory database.
+func ensureDataDir(path string) error {
+	if isMemory(path) {
+		return nil
+	}
+	dir := filepath.Dir(path)
+	if dir == "" {
+		return nil
+	}
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
+		return fmt.Errorf("database: create data dir %q: %w", dir, err)
+	}
+	if err := os.Chmod(dir, dirPerm); err != nil {
+		return fmt.Errorf("database: secure data dir %q: %w", dir, err)
+	}
+	return nil
 }
 
 // dsnFor builds the modernc DSN. modernc applies each _pragma query parameter as
@@ -108,7 +127,10 @@ func (db *DB) secureDBFiles() error {
 	paths := append([]string{db.path}, sideFiles(db.path)...)
 	for _, p := range paths {
 		if _, err := os.Stat(p); err != nil {
-			continue // a side file that does not exist needs no chmod
+			if errors.Is(err, fs.ErrNotExist) {
+				continue // a side file that does not exist needs no chmod
+			}
+			return fmt.Errorf("database: stat %q: %w", p, err) // surface permission/IO errors
 		}
 		if err := os.Chmod(p, filePerm); err != nil {
 			return fmt.Errorf("database: chmod %q: %w", p, err)

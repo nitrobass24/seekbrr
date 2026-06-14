@@ -26,7 +26,7 @@ FROM alpine:3.21
 # healthcheck; tzdata for correct date parsing across locales.
 RUN apk add --no-cache ca-certificates tzdata \
  && addgroup -S harbrr && adduser -S -G harbrr -H -u 1000 harbrr \
- && mkdir -p /config && chown harbrr:harbrr /config
+ && mkdir -p /config && chown harbrr:harbrr /config && chmod 700 /config
 
 COPY --from=build /out/harbrr /usr/local/bin/harbrr
 

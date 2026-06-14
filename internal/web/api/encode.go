@@ -7,6 +7,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/autobrr/harbrr/internal/auth"
@@ -34,13 +35,19 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, errorResponse{Error: msg})
 }
 
-// decodeJSON decodes the request body into dst, rejecting unknown fields. On
+// decodeJSON decodes a single JSON object from the request body into dst,
+// rejecting unknown fields and any trailing data after the first object. On
 // failure it writes a 400 and returns false.
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return false
+	}
+	// Exactly one JSON value is allowed; a second Decode must hit EOF.
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "unexpected trailing data after JSON body")
 		return false
 	}
 	return true

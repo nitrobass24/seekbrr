@@ -178,6 +178,9 @@ func TestAddPersistsSecretEncrypted(t *testing.T) {
 			secret            bool
 		}{deref(value), deref(enc), deref(keyID), isSecret != 0}
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate settings: %v", err)
+	}
 
 	api := got["apikey"]
 	if !api.secret {
@@ -252,7 +255,10 @@ func TestUpdateRedactedPreservesSecret(t *testing.T) {
 	if got := settingEnc(t, db, inst.ID, "apikey"); got != origEnc {
 		t.Error("apikey ciphertext changed after <redacted> update (should be preserved)")
 	}
-	_, views, _ := reg.Get(ctx, "tt")
+	_, views, err := reg.Get(ctx, "tt")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
 	for _, v := range views {
 		if v.Name == "sort" && v.Value != "leechers" {
 			t.Errorf("sort = %q, want leechers (updated)", v.Value)

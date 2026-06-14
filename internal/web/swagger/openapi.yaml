@@ -299,6 +299,9 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+      description: >
+        A bearer credential — send over HTTPS only; it must never traverse a
+        cleartext link. Terminate TLS at harbrr or a trusted reverse proxy.
   responses:
     BadRequest:
       description: invalid request

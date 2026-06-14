@@ -44,6 +44,9 @@ func (Instances) Insert(ctx context.Context, q dbinterface.Execer, inst domain.I
 
 // InsertSetting writes one setting row for an instance.
 func (Instances) InsertSetting(ctx context.Context, q dbinterface.Execer, instanceID int64, s domain.IndexerSetting) error {
+	if err := validateSettingInvariant(s); err != nil {
+		return err
+	}
 	_, err := q.ExecContext(
 		ctx,
 		`INSERT INTO indexer_settings (instance_id, name, value, value_encrypted, key_id, is_secret)
@@ -214,6 +217,27 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// validateSettingInvariant enforces the storage contract at the DB boundary so a
+// caller regression can never persist a credential in cleartext: a secret never
+// stores a plaintext value column and always carries the key_id it was encrypted
+// under; a non-secret never carries ciphertext or a key_id. (A secret's
+// value_encrypted may be empty when the secret's plaintext value is empty.)
+func validateSettingInvariant(s domain.IndexerSetting) error {
+	if s.IsSecret {
+		if s.Value != "" {
+			return fmt.Errorf("database: secret setting %q must not store a plaintext value", s.Name)
+		}
+		if s.KeyID == "" {
+			return fmt.Errorf("database: secret setting %q is missing its key_id", s.Name)
+		}
+		return nil
+	}
+	if s.ValueEncrypted != "" || s.KeyID != "" {
+		return fmt.Errorf("database: non-secret setting %q must not carry ciphertext or a key_id", s.Name)
+	}
+	return nil
 }
 
 // nullIfEmpty maps "" to a NULL column value so empty stays distinct from set.

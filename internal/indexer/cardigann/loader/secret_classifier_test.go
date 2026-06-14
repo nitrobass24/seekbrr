@@ -54,7 +54,7 @@ func TestIsSecretCases(t *testing.T) {
 // across the vendored corpus and pins the result to a golden file. A re-vendor
 // that introduces a new secret-shaped field changes the golden, forcing a human
 // to confirm the classifier still encrypts/redacts it. Regenerate with
-// UPDATE_GOLDEN=1 go test ./internal/indexer/cardigann/loader/.
+// UPDATE_GOLDEN=1 go test -race -count=1 ./internal/indexer/cardigann/loader/.
 func TestSecretClassifierCorpusAudit(t *testing.T) {
 	t.Parallel()
 
@@ -101,7 +101,7 @@ func TestSecretClassifierCorpusAudit(t *testing.T) {
 
 	want, err := os.ReadFile(golden)
 	if err != nil {
-		t.Fatalf("read golden (run UPDATE_GOLDEN=1 to create): %v", err)
+		t.Fatalf("read golden (run UPDATE_GOLDEN=1 go test -race -count=1 ./internal/indexer/cardigann/loader/ to create): %v", err)
 	}
 	if string(want) != string(buf) {
 		t.Errorf("secret_audit.txt is stale — re-run with UPDATE_GOLDEN=1 and review the diff")

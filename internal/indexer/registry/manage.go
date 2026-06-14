@@ -84,6 +84,12 @@ func (r *Registry) Add(ctx context.Context, p AddParams) (domain.IndexerInstance
 		return r.writeSettings(ctx, tx, id, settingFields(def), p.Settings)
 	})
 	if err != nil {
+		// ensureSlugFree is a pre-check; a concurrent Add can still lose the race
+		// to the UNIQUE(slug) constraint. Map that to ErrConflict so conflict
+		// semantics hold either way.
+		if database.IsUniqueViolation(err) {
+			return domain.IndexerInstance{}, fmt.Errorf("%w: indexer %q", ErrConflict, slug)
+		}
 		return domain.IndexerInstance{}, err
 	}
 	r.invalidate(slug)

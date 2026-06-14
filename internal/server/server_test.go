@@ -162,7 +162,10 @@ func buildStack(t *testing.T, basePath string) (*stack, *stdhttp.Client) {
 
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
-	jar, _ := cookiejar.New(nil)
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("cookie jar: %v", err)
+	}
 	return &stack{url: ts.URL + basePath, db: db}, &stdhttp.Client{Jar: jar}
 }
 
@@ -265,13 +268,19 @@ func assertEncryptedAtRest(t *testing.T, db *database.DB, plaintext string) {
 
 func mustGet(t *testing.T, c *stdhttp.Client, url string, want int) string {
 	t.Helper()
-	req, _ := stdhttp.NewRequestWithContext(context.Background(), stdhttp.MethodGet, url, nil)
+	req, err := stdhttp.NewRequestWithContext(context.Background(), stdhttp.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("new request %s: %v", url, err)
+	}
 	resp, err := c.Do(req)
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body %s: %v", url, err)
+	}
 	if resp.StatusCode != want {
 		t.Fatalf("GET %s: status %d, want %d (%s)", url, resp.StatusCode, want, body)
 	}
@@ -280,14 +289,23 @@ func mustGet(t *testing.T, c *stdhttp.Client, url string, want int) string {
 
 func mustJSON(t *testing.T, c *stdhttp.Client, method, url string, payload any, want int) (*stdhttp.Response, []byte) {
 	t.Helper()
-	b, _ := json.Marshal(payload)
-	req, _ := stdhttp.NewRequestWithContext(context.Background(), method, url, bytes.NewReader(b))
+	b, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal %s: %v", url, err)
+	}
+	req, err := stdhttp.NewRequestWithContext(context.Background(), method, url, bytes.NewReader(b))
+	if err != nil {
+		t.Fatalf("new request %s: %v", url, err)
+	}
 	resp, err := c.Do(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, url, err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body %s: %v", url, err)
+	}
 	if resp.StatusCode != want {
 		t.Fatalf("%s %s: status %d, want %d (%s)", method, url, resp.StatusCode, want, body)
 	}
