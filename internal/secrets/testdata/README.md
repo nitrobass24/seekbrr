@@ -72,8 +72,8 @@ The behaviours below are pinned by tests in `internal/secrets`, `internal/auth`,
   `/api/openapi.yaml`; the rendered Swagger UI lands with the web UI.
   `[Tracked: Phase 8]`
 - **`api_keys.last_used_at` is never written.** Validation is a pure read (no
-  write on the request path); a debounced "touch" lands later.
-  `[Tracked: Phase 6]` (health/stats).
+  write on the request path); the auth event log populates it later.
+  `[Tracked: Phase 8]` (stats / search history).
 - **Safe export/import not built.** §9 describes a config/DB export that redacts
   secrets behind the `<redacted>` sentinel by default with a separately-encrypted
   include-secrets opt-in. The `<redacted>` sentinel exists for the edit/update flow;

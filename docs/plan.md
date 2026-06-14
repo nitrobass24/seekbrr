@@ -73,8 +73,9 @@ decoupled.
 
 Turns the proven engine into a configurable headless daemon Sonarr/Radarr/autobrr can point at — the
 critical path everything product-facing depends on, and where the `docs/ideas.md` §9 security model is
-built. (harbrr cannot serve a single live request until this lands: today `cmd/harbrr serve` loads
-config and exits, and the Torznab handler has no production caller.)
+built. (Before this phase, `cmd/harbrr serve` loaded config and exited and the Torznab handler had no
+production caller; this phase makes harbrr a runnable, configurable daemon — the registry is now the
+production `Provider` the handler resolves through.)
 
 - [x] **SQLite store + migrations** behind `internal/database/dbinterface` (clean interface; Postgres
       stays deferred — Phase 8). Data dir `0700`; db + all SQLite side files (`-wal`/`-journal`) `0600`
@@ -127,9 +128,11 @@ Phase 3 "search real trackers end-to-end" goal.
 - [ ] Timeouts, backoff, per-indexer rate limits (anti-blacklist)
 - [ ] **Indexer health & status**: define health events (auth failure, rate-limited, parse error,
       anti-bot) and surface per-indexer status via the API; broken indexers already degrade cleanly (Phase 2)
-- [ ] **Per-indexer proxies** (HTTP / SOCKS4 / SOCKS5), configured per instance
-- [ ] **Secret hardening**: key rotation (re-encrypt via the stored `key_id`); secret redaction audited
-      end-to-end across logs, errors, traces, and the stats event log
+- [ ] **Per-indexer proxies** (HTTP / SOCKS4 / SOCKS5), configured per instance (the
+      `registry.WithDoerFactory` seam for a per-instance HTTP client is already in place from Phase 4)
+- [ ] **Secret hardening**: key rotation (re-encrypt via the stored `key_id` — already persisted per
+      record since Phase 4); secret redaction audited end-to-end across logs, errors, traces, and the
+      stats event log
 
 ## Phase 7 — Scale coverage
 
@@ -152,7 +155,8 @@ Phase 3 "search real trackers end-to-end" goal.
       from a Jackett/Prowlarr config
 - [ ] Native **harbrr → autobrr push** (closes the RSS-polling gap; family-only win)
 - [ ] cross-seed search backend
-- [ ] **Stats / search history** (query/grab/auth event log + query API); **notifications**
+- [ ] **Stats / search history** (query/grab/auth event log + query API; the auth event log populates
+      `api_keys.last_used_at`, left unwritten in Phase 4 to keep validation a pure read); **notifications**
       (Discord/webhook, pluggable provider)
 - [ ] **Web UI** — the management dashboard (indexer grid, add/edit forms, manual search, stats);
       depends on the Phase 4 management API. Includes rendering the embedded OpenAPI spec as Swagger UI
